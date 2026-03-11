@@ -1,0 +1,43 @@
+# Claude Code (IDE settings — lokalne)
+.claude/
+
+# Secrets — nigdy nie commituj!
+.env
+.env.local
+.env.production
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Uploads użytkowników — pliki binarne, nie należą do repo
+backend/static/uploads/*
+!backend/static/uploads/.gitkeep
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Node / Frontend
+node_modules/
+frontend/dist/
+.vite/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Docker
+*.log
