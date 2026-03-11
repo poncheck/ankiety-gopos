@@ -31,7 +31,7 @@ System ankiet dla restauracji integrujący się z kasą GoPOS. Klient podaje num
 ### 1. Sklonuj repo i skopiuj konfigurację
 
 ```bash
-git clone <url-repo>
+git clone https://github.com/poncheck/ankiety-gopos.git
 cd ankiety
 cp .env.example .env
 ```
