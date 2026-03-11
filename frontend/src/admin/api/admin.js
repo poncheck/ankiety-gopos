@@ -83,3 +83,11 @@ export const uploadLogo = (file) => uploadFile("/settings/logo", file);
 export const deleteLogo = () => apiFetch("/settings/logo", { method: "DELETE" });
 export const uploadReceiptImage = (file) => uploadFile("/settings/receipt-image", file);
 export const deleteReceiptImage = () => apiFetch("/settings/receipt-image", { method: "DELETE" });
+
+// --- Import pytań ---
+export const importQuestions = (text) =>
+  apiFetch("/import/questions", {
+    method: "POST",
+    headers: { "Content-Type": "text/plain" },
+    body: text,
+  });

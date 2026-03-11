@@ -11,6 +11,7 @@ import ResponsesPage from "./admin/ResponsesPage.jsx";
 import ResponseDetailPage from "./admin/ResponseDetailPage.jsx";
 import ProductsPage from "./admin/ProductsPage.jsx";
 import SettingsPage from "./admin/SettingsPage.jsx";
+import ImportPage from "./admin/ImportPage.jsx";
 
 function SurveyApp() {
   const [bill, setBill] = useState(null);
@@ -71,6 +72,7 @@ export default function App() {
           <Route path="responses" element={<ResponsesPage />} />
           <Route path="responses/:id" element={<ResponseDetailPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="import" element={<ImportPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

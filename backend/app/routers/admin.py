@@ -2,7 +2,7 @@ import os
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -496,3 +496,108 @@ async def update_instructions(body: InstructionsUpdate, db: AsyncSession = Depen
     row.receipt_instructions = body.text or None
     await db.commit()
     return {"receipt_instructions": row.receipt_instructions}
+
+
+# ---------- Import pytań ----------
+
+def _parse_question_type(raw: str) -> tuple[str, list[str] | None]:
+    """Parsuje typ pytania z formatu tekstowego. Zwraca (type, options)."""
+    raw = raw.strip().lower()
+    if raw == "ocena":
+        return "rating", None
+    if raw == "tak/nie":
+        return "yesno", None
+    if raw == "tekst":
+        return "text", None
+    if raw.startswith("wybor:"):
+        opts = [o.strip() for o in raw[6:].split(",") if o.strip()]
+        if not opts:
+            raise ValueError("Typ 'wybor' wymaga co najmniej jednej opcji")
+        return "choice", opts
+    raise ValueError(f"Nieznany typ '{raw}' — użyj: ocena, tak/nie, tekst, wybor: opcja1, opcja2")
+
+
+@router.post("/import/questions", dependencies=[Depends(_get_current_admin)])
+async def import_questions(request: Request, db: AsyncSession = Depends(get_db)):
+    """Importuje pytania z pliku tekstowego.
+
+    Format:
+        KATEGORIA: Nazwa kategorii
+        Treść pytania | typ
+
+    Typy: ocena, tak/nie, tekst, wybor: opcja1, opcja2
+    Linie zaczynające się od # są ignorowane.
+    """
+    body_bytes = await request.body()
+    try:
+        content = body_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        raise HTTPException(422, "Plik musi być w kodowaniu UTF-8")
+
+    # Załaduj wszystkie kategorie raz
+    cats_result = await db.execute(select(Category))
+    categories = {c.name.lower(): c for c in cats_result.scalars().all()}
+
+    imported = 0
+    skipped = 0
+    errors: list[dict] = []
+    current_category: Category | None = None
+    position_counter = 0
+
+    for line_no, raw_line in enumerate(content.splitlines(), start=1):
+        line = raw_line.strip()
+
+        # Pomiń komentarze, puste linie i separatory
+        if not line or line.startswith("#") or line == "---":
+            continue
+
+        # Nagłówek kategorii
+        if line.upper().startswith("KATEGORIA:"):
+            cat_name = line[10:].strip()
+            current_category = categories.get(cat_name.lower())
+            if current_category is None:
+                errors.append({"line": line_no, "message": f"Kategoria '{cat_name}' nie istnieje w systemie"})
+            else:
+                position_counter = 0
+            continue
+
+        # Linia pytania: Treść | typ
+        if "|" not in line:
+            errors.append({"line": line_no, "message": f"Brak separatora '|' — oczekiwano: Treść pytania | typ"})
+            skipped += 1
+            continue
+
+        if current_category is None:
+            errors.append({"line": line_no, "message": "Pytanie przed deklaracją KATEGORIA"})
+            skipped += 1
+            continue
+
+        parts = line.split("|", maxsplit=1)
+        text = parts[0].strip()
+        type_raw = parts[1].strip()
+
+        if not text:
+            errors.append({"line": line_no, "message": "Treść pytania jest pusta"})
+            skipped += 1
+            continue
+
+        try:
+            q_type, q_options = _parse_question_type(type_raw)
+        except ValueError as e:
+            errors.append({"line": line_no, "message": str(e)})
+            skipped += 1
+            continue
+
+        db.add(Question(
+            category_id=current_category.id,
+            text=text,
+            type=q_type,
+            options=q_options,
+            position=position_counter,
+            active=True,
+        ))
+        position_counter += 1
+        imported += 1
+
+    await db.commit()
+    return {"imported": imported, "skipped": skipped, "errors": errors}
