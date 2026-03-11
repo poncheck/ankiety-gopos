@@ -32,7 +32,7 @@ System ankiet dla restauracji integrujący się z kasą GoPOS. Klient podaje num
 
 ```bash
 git clone https://github.com/poncheck/ankiety-gopos.git
-cd ankiety
+cd ankiety-gopos
 cp .env.example .env
 ```
 
