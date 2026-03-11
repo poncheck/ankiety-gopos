@@ -6,6 +6,7 @@ export default defineConfig({
   server: {
     host: true,
     port: 3000,
+    allowedHosts: process.env.ALLOWED_HOST ? [process.env.ALLOWED_HOST] : [],
     proxy: {
       "/api": {
         target: "http://backend:8000",
