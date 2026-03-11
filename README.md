@@ -9,6 +9,7 @@ System ankiet dla restauracji integrujący się z kasą GoPOS. Klient podaje num
   - **Kategorie** — synchronizacja kategorii produktów z GoPOS, przypisywanie pytań
   - **Produkty** — przeglądanie i ręczne przypisywanie kategorii do produktów
   - **Odpowiedzi** — lista paragonów z wypełnionymi ankietami, zestawienie statystyk per produkt
+  - **Import pytań** — wgranie pliku `.txt` z pytaniami przygotowanymi przez współpracownika
   - **Ustawienia** — logo, instrukcja i zdjęcie przykładowego paragonu widoczne na stronie ankiety
 
 ## Stack technologiczny
@@ -70,7 +71,7 @@ docker compose up --build
 
 1. **Kategorie** → "Synchronizuj z GoPOS" — pobiera kategorie produktów
 2. **Produkty** → "Synchronizuj produkty" — pobiera cache produktów z GoPOS
-3. **Kategorie** → wybierz kategorię → dodaj pytania ankietowe (ocena, tak/nie, tekst, wybór)
+3. **Import pytań** → pobierz szablon `.txt`, wypełnij pytania, wgraj plik
 4. **Ustawienia** → dodaj logo i instrukcję
 
 ## Bezpieczeństwo
@@ -113,3 +114,19 @@ ankiety/
 | `SECRET_KEY` | Klucz do podpisywania JWT — minimum 32 losowe znaki |
 | `ADMIN_USERNAME` | Login do panelu admina |
 | `ADMIN_PASSWORD` | Hasło do panelu admina |
+| `ALLOWED_HOST` | Domena serwera (np. `ankieta.cukru.cafe`) — wymagane gdy Vite zgłasza "Blocked request" |
+
+---
+
+## Changelog
+
+### 2025-03-11
+- **Import pytań z pliku .txt** — nowa sekcja w panelu admina; szablon do pobrania, upload pliku lub wklejenie treści, wynik importu z listą błędów per linia
+
+### 2025-03-10
+- **Ustawienia wyglądu** — logo, zdjęcie przykładowego paragonu, instrukcja tekstowa; pliki serwowane przez FastAPI StaticFiles
+- **Statystyki odpowiedzi per produkt** — zakładka "Zestawienie wg produktów" z wykresami ocen, tak/nie, wyborów
+- **Bezpieczeństwo** — usunięcie publicznych endpointów debug (`/api/auth/*`), limity długości pól wejściowych, `.gitignore`
+- **`ALLOWED_HOST`** — konfiguracja dozwolonych hostów Vite przez zmienną środowiskową
+- **Nazwy produktów w ankiecie** — przywrócenie `items.product` w include GoPOS API
+- **GitHub** — pierwsze publiczne wydanie: https://github.com/poncheck/ankiety-gopos
