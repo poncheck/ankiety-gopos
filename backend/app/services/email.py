@@ -66,6 +66,7 @@ Zespół restauracji
     msg.attach(MIMEText(text_body, "plain", "utf-8"))
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
+    use_ssl = settings.smtp_port == 465
     try:
         await aiosmtplib.send(
             msg,
@@ -73,7 +74,8 @@ Zespół restauracji
             port=settings.smtp_port,
             username=settings.smtp_username,
             password=settings.smtp_password,
-            start_tls=settings.smtp_tls,
+            use_tls=use_ssl,
+            start_tls=(settings.smtp_tls and not use_ssl),
         )
         logger.info("Email z kodem %s wysłany na %s", code, to_email)
     except Exception:
