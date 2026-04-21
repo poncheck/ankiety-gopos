@@ -92,3 +92,11 @@ export const importQuestions = (text) =>
     headers: { "Content-Type": "text/plain" },
     body: text,
   });
+
+// --- Użytkownicy ---
+export const getUsers = () => apiFetch("/users");
+export const createUser = (username, password) =>
+  apiFetch("/users", { method: "POST", body: JSON.stringify({ username, password }) });
+export const deleteUser = (id) => apiFetch(`/users/${id}`, { method: "DELETE" });
+export const changePassword = (id, new_password) =>
+  apiFetch(`/users/${id}/password`, { method: "PUT", body: JSON.stringify({ new_password }) });

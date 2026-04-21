@@ -50,6 +50,7 @@ export default function AdminLayout() {
         <Link to="/admin/responses" style={s.navLink}>Odpowiedzi</Link>
         <Link to="/admin/import" style={s.navLink}>Import pytań</Link>
         <Link to="/admin/settings" style={s.navLink}>Ustawienia</Link>
+        <Link to="/admin/users" style={s.navLink}>Użytkownicy</Link>
         <Link to="/" style={s.navLink}>Ankieta</Link>
         <button style={s.logoutBtn} onClick={logout}>Wyloguj</button>
       </nav>
