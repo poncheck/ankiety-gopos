@@ -21,6 +21,7 @@ _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 1. Tworzenie tabel i migracje kolumn
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await conn.execute(
@@ -32,24 +33,32 @@ async def lifespan(app: FastAPI):
         await conn.execute(
             text("ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS marketing_consent BOOLEAN NOT NULL DEFAULT false")
         )
-        # Unikalny paragon — jeden raz ankieta
-        await conn.execute(
-            text("""
-                DO $$
-                BEGIN
-                    IF NOT EXISTS (
-                        SELECT 1 FROM pg_constraint
-                        WHERE conname = 'uq_survey_responses_fiscal_ref_id'
-                    ) THEN
-                        ALTER TABLE survey_responses
-                            ADD CONSTRAINT uq_survey_responses_fiscal_ref_id
-                            UNIQUE (fiscal_ref_id);
-                    END IF;
-                END $$;
-            """)
+
+    # 2. Unique constraint na fiscal_ref_id — osobna transakcja, pomijamy jeśli są duplikaty
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(
+                text("""
+                    DO $$
+                    BEGIN
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_constraint
+                            WHERE conname = 'uq_survey_responses_fiscal_ref_id'
+                        ) THEN
+                            ALTER TABLE survey_responses
+                                ADD CONSTRAINT uq_survey_responses_fiscal_ref_id
+                                UNIQUE (fiscal_ref_id);
+                        END IF;
+                    END $$;
+                """)
+            )
+    except Exception:
+        import logging
+        logging.getLogger(__name__).warning(
+            "Nie można dodać unique constraint na fiscal_ref_id — prawdopodobnie istnieją duplikaty w bazie."
         )
 
-    # Seed pierwszego admina z .env jeśli tabela jest pusta
+    # 3. Seed pierwszego admina z .env jeśli tabela jest pusta
     async with AsyncSessionLocal() as db:
         result = await db.execute(select(AdminUser).limit(1))
         if result.scalar_one_or_none() is None:
