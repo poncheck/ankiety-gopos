@@ -32,4 +32,5 @@ class SurveyAnswer(BaseModel):
 
 class SurveySubmission(BaseModel):
     bill_number: str = Field(..., max_length=100)
+    email: str | None = Field(None, max_length=255)
     answers: list[SurveyAnswer] = Field(..., max_length=200)

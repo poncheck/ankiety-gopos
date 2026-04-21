@@ -62,6 +62,23 @@ const styles = {
     cursor: "pointer",
   },
   error: { color: "#dc2626", fontSize: "0.875rem", marginTop: "0.5rem" },
+  emailSection: {
+    marginTop: "1.5rem",
+    padding: "1.25rem",
+    border: "1.5px solid #e5e7eb",
+    borderRadius: "10px",
+    background: "#f9fafb",
+  },
+  emailLabel: { fontWeight: 600, fontSize: "0.9rem", color: "#374151", marginBottom: "0.4rem", display: "block" },
+  emailHint: { fontSize: "0.8rem", color: "#6b7280", marginBottom: "0.75rem" },
+  emailInput: {
+    width: "100%",
+    padding: "0.6rem 0.75rem",
+    border: "1.5px solid #d1d5db",
+    borderRadius: "8px",
+    fontSize: "0.9rem",
+    boxSizing: "border-box",
+  },
   // rating
   stars: { display: "flex", gap: "0.5rem" },
   star: {
@@ -206,6 +223,7 @@ function QuestionInput({ question, value, onChange }) {
 
 export default function SurveyView({ bill, onDone }) {
   const [answers, setAnswers] = useState({});
+  const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -214,6 +232,14 @@ export default function SurveyView({ bill, onDone }) {
   }
 
   async function handleSubmit() {
+    if (!email.trim()) {
+      setError("Podaj adres e-mail, aby otrzymać kod rabatowy.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError("Podaj poprawny adres e-mail.");
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -226,8 +252,8 @@ export default function SurveyView({ bill, onDone }) {
           }
         }
       }
-      await submitSurvey({ bill_number: bill.bill_number, answers: answerList });
-      onDone();
+      const result = await submitSurvey({ bill_number: bill.bill_number, email: email.trim(), answers: answerList });
+      onDone(result.code);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -266,6 +292,24 @@ export default function SurveyView({ bill, onDone }) {
         </div>
       ))}
 
+      <div style={styles.emailSection}>
+        <label style={styles.emailLabel} htmlFor="survey-email">
+          Adres e-mail
+        </label>
+        <p style={styles.emailHint}>
+          Po wysłaniu ankiety otrzymasz na ten adres kod rabatowy do wykorzystania przy kolejnej wizycie.
+        </p>
+        <input
+          id="survey-email"
+          type="email"
+          style={styles.emailInput}
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          placeholder="twoj@email.pl"
+          autoComplete="email"
+        />
+      </div>
+
       {error && <p style={styles.error}>{error}</p>}
 
       <button
@@ -273,7 +317,7 @@ export default function SurveyView({ bill, onDone }) {
         onClick={handleSubmit}
         disabled={submitting}
       >
-        {submitting ? "Wysyłanie..." : "Wyślij ankietę"}
+        {submitting ? "Wysyłanie..." : "Wyślij ankietę i odbierz kod"}
       </button>
     </div>
   );

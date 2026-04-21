@@ -47,6 +47,8 @@ class SurveyResponse(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     fiscal_ref_id: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
     gopos_order_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
+    email: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    code: Mapped[str | None] = mapped_column(String(20), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     answers: Mapped[list["Answer"]] = relationship(back_populates="response", cascade="all, delete-orphan")

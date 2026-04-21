@@ -1,4 +1,6 @@
 import logging
+import secrets
+import string
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import select
@@ -7,11 +9,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.db import Answer, ProductCache, Question, SurveyResponse
 from app.models.survey import BillResponse, Product, SurveySubmission
+from app.services.email import send_survey_code
 from app.services.gopos import get_bill
 from app.services.questions import get_questions_for_product
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+_CODE_CHARS = string.ascii_uppercase + string.digits
+_CODE_LENGTH = 8
+
+
+def _generate_code() -> str:
+    return "".join(secrets.choice(_CODE_CHARS) for _ in range(_CODE_LENGTH))
 
 
 async def _ensure_product_in_cache(product: Product, db: AsyncSession) -> None:
@@ -50,10 +60,14 @@ async def fetch_bill(bill_number: str, db: AsyncSession = Depends(get_db)):
 
 @router.post("/submit")
 async def submit_survey(submission: SurveySubmission, db: AsyncSession = Depends(get_db)):
-    """Zapisuje wypełnioną ankietę do bazy danych."""
+    """Zapisuje wypełnioną ankietę, generuje kod i wysyła go emailem."""
+    code = _generate_code()
+
     survey_response = SurveyResponse(
         fiscal_ref_id=submission.bill_number,
         gopos_order_number=None,
+        email=submission.email or None,
+        code=code,
     )
     db.add(survey_response)
     await db.flush()
@@ -75,8 +89,12 @@ async def submit_survey(submission: SurveySubmission, db: AsyncSession = Depends
 
     await db.commit()
 
+    if submission.email:
+        await send_survey_code(submission.email, code)
+
     return {
         "status": "ok",
         "message": "Dziękujemy za wypełnienie ankiety!",
         "response_id": survey_response.id,
+        "code": code,
     }

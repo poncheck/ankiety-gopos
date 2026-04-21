@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import text
 
 from app.database import Base, engine
 from app.routers import admin, survey
@@ -17,6 +18,12 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)  # musi być PRZED app.mount StaticFiles
 async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(
+            text("ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS email VARCHAR(255)")
+        )
+        await conn.execute(
+            text("ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS code VARCHAR(20)")
+        )
     yield
 
 
