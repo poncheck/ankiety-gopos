@@ -24,6 +24,9 @@ async def lifespan(app: FastAPI):
         await conn.execute(
             text("ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS code VARCHAR(20)")
         )
+        await conn.execute(
+            text("ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS marketing_consent BOOLEAN NOT NULL DEFAULT false")
+        )
     yield
 
 

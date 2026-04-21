@@ -53,6 +53,7 @@ export const deleteQuestion = (id) => apiFetch(`/questions/${id}`, { method: "DE
 export const getResponses = (page = 0) => apiFetch(`/responses?page=${page}&size=20`);
 export const getResponse = (id) => apiFetch(`/responses/${id}`);
 export const getProductStats = () => apiFetch("/stats/products");
+export const getMarketingEmails = () => apiFetch("/marketing-emails");
 
 // --- Settings helpers ---
 async function uploadFile(path, file) {

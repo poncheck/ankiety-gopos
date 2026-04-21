@@ -121,6 +121,29 @@ export default function ResponseDetailPage() {
           <span style={s.metaLabel}>Odpowiedzi łącznie</span>
           <span style={s.metaValue}>{response.answers.length}</span>
         </div>
+        {response.email && (
+          <div style={s.metaItem}>
+            <span style={s.metaLabel}>E-mail klienta</span>
+            <span style={s.metaValue}>{response.email}</span>
+          </div>
+        )}
+        {response.code && (
+          <div style={s.metaItem}>
+            <span style={s.metaLabel}>Kod rabatowy</span>
+            <span style={{ ...s.metaValue, letterSpacing: "0.1em" }}>{response.code}</span>
+          </div>
+        )}
+        {response.email && (
+          <div style={s.metaItem}>
+            <span style={s.metaLabel}>Zgoda mkt</span>
+            <span style={{
+              ...s.metaValue,
+              color: response.marketing_consent ? "#15803d" : "#9ca3af",
+            }}>
+              {response.marketing_consent ? "TAK" : "NIE"}
+            </span>
+          </div>
+        )}
       </div>
 
       {productOrder.length === 0 && (

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getResponses, getProductStats } from "./api/admin.js";
+import { getResponses, getProductStats, getMarketingEmails } from "./api/admin.js";
 
 // ─── Style ────────────────────────────────────────────────────────────────────
 
@@ -139,6 +139,38 @@ const s = {
 
   empty: { color: "#6b7280", textAlign: "center", padding: "3rem 0" },
   err: { color: "#dc2626", fontSize: "0.875rem" },
+
+  // Email badges on cards
+  emailBadge: {
+    display: "inline-flex", alignItems: "center", gap: "0.3rem",
+    fontSize: "0.75rem", color: "#374151",
+    background: "#f1f5f9", borderRadius: "20px",
+    padding: "0.15rem 0.55rem", marginTop: "0.35rem",
+  },
+  consentBadge: {
+    display: "inline-flex", alignItems: "center", gap: "0.3rem",
+    fontSize: "0.72rem", fontWeight: 600,
+    background: "#dcfce7", color: "#15803d",
+    borderRadius: "20px", padding: "0.15rem 0.55rem", marginLeft: "0.35rem",
+  },
+
+  // Marketing tab
+  mktCard: {
+    background: "#fff", borderRadius: "10px", padding: "0.85rem 1.25rem",
+    marginBottom: "0.6rem", boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+    display: "flex", alignItems: "center", justifyContent: "space-between",
+  },
+  mktEmail: { fontWeight: 600, color: "#111827", fontSize: "0.95rem" },
+  mktDate: { fontSize: "0.78rem", color: "#6b7280" },
+  copyBtn: {
+    border: "1.5px solid #d1d5db", borderRadius: "6px", padding: "0.3rem 0.75rem",
+    cursor: "pointer", background: "#fff", fontSize: "0.8rem", fontWeight: 600, color: "#374151",
+  },
+  mktSummary: {
+    background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: "10px",
+    padding: "1rem 1.25rem", marginBottom: "1.25rem", fontSize: "0.875rem", color: "#15803d",
+    display: "flex", alignItems: "center", gap: "0.75rem",
+  },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -309,6 +341,12 @@ function ReceiptsTab() {
                 ? r.products.map((p) => <span key={p.id} style={s.productTag}>{p.name}</span>)
                 : <span style={s.noProducts}>brak nazw produktów</span>}
             </div>
+            {r.email && (
+              <div style={{ marginTop: "0.4rem" }}>
+                <span style={s.emailBadge}>✉ {r.email}</span>
+                {r.marketing_consent && <span style={s.consentBadge}>✓ zgoda mkt</span>}
+              </div>
+            )}
           </div>
           <div style={s.right}>
             <span style={s.answerCount}>{r.answer_count} odp.</span>
@@ -356,6 +394,68 @@ function StatsTab() {
   );
 }
 
+// ─── Tab: E-maile promocyjne ──────────────────────────────────────────────────
+
+function MarketingTab() {
+  const [data, setData] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    getMarketingEmails().then(setData).catch((err) => setError(err.message));
+  }, []);
+
+  function copyAll() {
+    const list = (data?.emails || []).map((e) => e.email).join("\n");
+    navigator.clipboard.writeText(list).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  }
+
+  if (error) return <p style={s.err}>{error}</p>;
+  if (!data) return <p style={{ color: "#6b7280" }}>Ładowanie...</p>;
+
+  return (
+    <>
+      <div style={s.header}>
+        <h1 style={s.title}>E-maile promocyjne</h1>
+        <span style={s.count}>({data.total} unikalnych)</span>
+      </div>
+      {data.total === 0 ? (
+        <p style={s.empty}>Brak klientów z wyrażoną zgodą marketingową.</p>
+      ) : (
+        <>
+          <div style={s.mktSummary}>
+            <span style={{ fontSize: "1.3rem" }}>✉</span>
+            <span>
+              <strong>{data.total}</strong> klientów wyraziło zgodę na otrzymywanie informacji promocyjnych.
+              Możesz skopiować wszystkie adresy do swojego narzędzia do wysyłki.
+            </span>
+            <button style={{ ...s.copyBtn, marginLeft: "auto", background: copied ? "#dcfce7" : "#fff" }} onClick={copyAll}>
+              {copied ? "Skopiowano!" : "Kopiuj wszystkie"}
+            </button>
+          </div>
+          {data.emails.map((row) => (
+            <div key={row.email} style={s.mktCard}>
+              <div>
+                <div style={s.mktEmail}>{row.email}</div>
+                <div style={s.mktDate}>Ostatnia ankieta: {formatDate(row.last_survey)}</div>
+              </div>
+              <button
+                style={s.copyBtn}
+                onClick={() => navigator.clipboard.writeText(row.email)}
+              >
+                Kopiuj
+              </button>
+            </div>
+          ))}
+        </>
+      )}
+    </>
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function ResponsesPage() {
@@ -376,9 +476,17 @@ export default function ResponsesPage() {
         >
           Zestawienie wg produktów
         </button>
+        <button
+          style={activeTab === "marketing" ? s.tabActive : s.tab}
+          onClick={() => setActiveTab("marketing")}
+        >
+          E-maile promocyjne
+        </button>
       </div>
 
-      {activeTab === "receipts" ? <ReceiptsTab /> : <StatsTab />}
+      {activeTab === "receipts" && <ReceiptsTab />}
+      {activeTab === "stats" && <StatsTab />}
+      {activeTab === "marketing" && <MarketingTab />}
     </div>
   );
 }

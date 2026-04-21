@@ -49,6 +49,7 @@ class SurveyResponse(Base):
     gopos_order_number: Mapped[str | None] = mapped_column(String(50), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True)
     code: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    marketing_consent: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     answers: Mapped[list["Answer"]] = relationship(back_populates="response", cascade="all, delete-orphan")

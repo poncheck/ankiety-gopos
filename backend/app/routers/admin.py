@@ -235,6 +235,9 @@ async def list_responses(
             "created_at": r.created_at,
             "answer_count": answer_count,
             "products": products,
+            "email": r.email,
+            "code": r.code,
+            "marketing_consent": r.marketing_consent,
         })
 
     return {"total": total, "page": page, "size": size, "items": items}
@@ -256,6 +259,9 @@ async def get_response(response_id: int, db: AsyncSession = Depends(get_db)):
         "fiscal_ref_id": r.fiscal_ref_id,
         "gopos_order_number": r.gopos_order_number,
         "created_at": r.created_at,
+        "email": r.email,
+        "code": r.code,
+        "marketing_consent": r.marketing_consent,
         "answers": [
             {
                 "id": a.id,
@@ -268,6 +274,22 @@ async def get_response(response_id: int, db: AsyncSession = Depends(get_db)):
             for a in answers
         ],
     }
+
+
+# ---------- Marketing emails ----------
+
+@router.get("/marketing-emails", dependencies=[Depends(_get_current_admin)])
+async def marketing_emails(db: AsyncSession = Depends(get_db)):
+    """Zwraca listę unikalnych emaili z wyrażoną zgodą marketingową."""
+    result = await db.execute(
+        select(SurveyResponse.email, func.max(SurveyResponse.created_at).label("last_survey"))
+        .where(SurveyResponse.marketing_consent == True)  # noqa: E712
+        .where(SurveyResponse.email.is_not(None))
+        .group_by(SurveyResponse.email)
+        .order_by(func.max(SurveyResponse.created_at).desc())
+    )
+    rows = result.all()
+    return {"total": len(rows), "emails": [{"email": r.email, "last_survey": r.last_survey} for r in rows]}
 
 
 # ---------- Stats ----------

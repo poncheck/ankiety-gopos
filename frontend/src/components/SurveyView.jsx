@@ -79,6 +79,9 @@ const styles = {
     fontSize: "0.9rem",
     boxSizing: "border-box",
   },
+  consentRow: { display: "flex", alignItems: "flex-start", gap: "0.6rem", marginTop: "0.85rem", cursor: "pointer" },
+  consentCheckbox: { marginTop: "2px", width: "16px", height: "16px", cursor: "pointer", flexShrink: 0 },
+  consentText: { fontSize: "0.78rem", color: "#6b7280", lineHeight: 1.4 },
   // rating
   stars: { display: "flex", gap: "0.5rem" },
   star: {
@@ -224,6 +227,7 @@ function QuestionInput({ question, value, onChange }) {
 export default function SurveyView({ bill, onDone }) {
   const [answers, setAnswers] = useState({});
   const [email, setEmail] = useState("");
+  const [marketingConsent, setMarketingConsent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -252,7 +256,7 @@ export default function SurveyView({ bill, onDone }) {
           }
         }
       }
-      const result = await submitSurvey({ bill_number: bill.bill_number, email: email.trim(), answers: answerList });
+      const result = await submitSurvey({ bill_number: bill.bill_number, email: email.trim(), marketing_consent: marketingConsent, answers: answerList });
       onDone(result.code);
     } catch (err) {
       setError(err.message);
@@ -308,6 +312,18 @@ export default function SurveyView({ bill, onDone }) {
           placeholder="twoj@email.pl"
           autoComplete="email"
         />
+        <label style={styles.consentRow}>
+          <input
+            type="checkbox"
+            style={styles.consentCheckbox}
+            checked={marketingConsent}
+            onChange={(e) => setMarketingConsent(e.target.checked)}
+          />
+          <span style={styles.consentText}>
+            Wyrażam zgodę na otrzymywanie informacji promocyjnych, ofert specjalnych i nowości
+            drogą elektroniczną na podany adres e-mail. Zgodę można wycofać w każdej chwili.
+          </span>
+        </label>
       </div>
 
       {error && <p style={styles.error}>{error}</p>}

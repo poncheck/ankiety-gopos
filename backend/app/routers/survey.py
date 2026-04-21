@@ -68,6 +68,7 @@ async def submit_survey(submission: SurveySubmission, db: AsyncSession = Depends
         gopos_order_number=None,
         email=submission.email or None,
         code=code,
+        marketing_consent=submission.marketing_consent,
     )
     db.add(survey_response)
     await db.flush()
