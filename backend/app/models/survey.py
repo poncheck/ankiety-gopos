@@ -21,6 +21,7 @@ class Product(BaseModel):
 class BillResponse(BaseModel):
     bill_number: str
     products: list[Product]
+    already_submitted: bool = False
 
 
 class SurveyAnswer(BaseModel):

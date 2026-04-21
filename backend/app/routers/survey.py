@@ -2,7 +2,7 @@ import logging
 import secrets
 import string
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -45,6 +45,14 @@ async def _ensure_product_in_cache(product: Product, db: AsyncSession) -> None:
 @router.get("/bill/{bill_number}", response_model=BillResponse)
 async def fetch_bill(bill_number: str, db: AsyncSession = Depends(get_db)):
     """Pobiera dane rachunku z GoPOS i zwraca listę produktów z pytaniami ankiety."""
+    already = await db.execute(
+        select(SurveyResponse.id).where(SurveyResponse.fiscal_ref_id == bill_number).limit(1)
+    )
+    if already.scalar_one_or_none() is not None:
+        bill = await get_bill(bill_number)
+        bill.already_submitted = True
+        return bill
+
     bill = await get_bill(bill_number)
 
     for product in bill.products:
@@ -61,6 +69,12 @@ async def fetch_bill(bill_number: str, db: AsyncSession = Depends(get_db)):
 @router.post("/submit")
 async def submit_survey(submission: SurveySubmission, db: AsyncSession = Depends(get_db)):
     """Zapisuje wypełnioną ankietę, generuje kod i wysyła go emailem."""
+    existing = await db.execute(
+        select(SurveyResponse.id).where(SurveyResponse.fiscal_ref_id == submission.bill_number).limit(1)
+    )
+    if existing.scalar_one_or_none() is not None:
+        raise HTTPException(status_code=409, detail="Ankieta dla tego paragonu została już wypełniona")
+
     code = _generate_code()
 
     survey_response = SurveyResponse(

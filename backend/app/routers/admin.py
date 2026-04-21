@@ -1,18 +1,20 @@
 import os
+import time
 import uuid
+from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
-from app.models.db import Answer, AppSettings, Category, ProductCache, Question, SurveyResponse
+from app.models.db import AdminUser, Answer, AppSettings, Category, ProductCache, Question, SurveyResponse
 from app.services.gopos import debug_bill, sync_categories, sync_items
 
 ALGORITHM = "HS256"
@@ -20,9 +22,13 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 8
 UPLOAD_DIR = "/app/static/uploads"
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+_RATE_WINDOW = 60  # sekund
+_RATE_MAX = 5     # prób na okno
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 bearer_scheme = HTTPBearer()
+
+_login_attempts: dict[str, list[float]] = defaultdict(list)
 
 
 class InstructionsUpdate(BaseModel):
@@ -38,26 +44,102 @@ class LoginRequest(BaseModel):
     password: str
 
 
-def _create_token(data: dict) -> str:
+def _create_token(username: str) -> str:
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    return jwt.encode({**data, "exp": expire}, settings.secret_key, algorithm=ALGORITHM)
+    return jwt.encode({"sub": username, "exp": expire}, settings.secret_key, algorithm=ALGORITHM)
 
 
-async def _get_current_admin(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)):
+def _check_rate_limit(ip: str) -> None:
+    now = time.time()
+    _login_attempts[ip] = [t for t in _login_attempts[ip] if now - t < _RATE_WINDOW]
+    if len(_login_attempts[ip]) >= _RATE_MAX:
+        raise HTTPException(status_code=429, detail="Zbyt wiele prób logowania. Poczekaj minutę.")
+    _login_attempts[ip].append(now)
+
+
+async def _get_current_admin(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: AsyncSession = Depends(get_db),
+) -> str:
     try:
         payload = jwt.decode(credentials.credentials, settings.secret_key, algorithms=[ALGORITHM])
-        if payload.get("sub") != "admin":
+        username: str | None = payload.get("sub")
+        if not username:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Nieautoryzowany")
     except JWTError:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Nieważny token")
 
+    result = await db.execute(select(AdminUser).where(AdminUser.username == username, AdminUser.is_active == True))  # noqa: E712
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Użytkownik nieaktywny lub usunięty")
+    return username
+
 
 @router.post("/login")
-async def login(body: LoginRequest):
-    if body.username != settings.admin_username or body.password != settings.admin_password:
+async def login(body: LoginRequest, request: Request, db: AsyncSession = Depends(get_db)):
+    client_ip = request.client.host if request.client else "unknown"
+    _check_rate_limit(client_ip)
+
+    result = await db.execute(select(AdminUser).where(AdminUser.username == body.username, AdminUser.is_active == True))  # noqa: E712
+    user = result.scalar_one_or_none()
+    if not user or not pwd_context.verify(body.password, user.password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Błędne dane logowania")
-    token = _create_token({"sub": "admin"})
+
+    token = _create_token(user.username)
     return {"access_token": token, "token_type": "bearer"}
+
+
+# ---------- User management ----------
+
+class UserCreate(BaseModel):
+    username: str = Field(..., min_length=3, max_length=100)
+    password: str = Field(..., min_length=8)
+
+
+class PasswordChange(BaseModel):
+    new_password: str = Field(..., min_length=8)
+
+
+@router.get("/users", dependencies=[Depends(_get_current_admin)])
+async def list_users(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(AdminUser).order_by(AdminUser.created_at))
+    users = result.scalars().all()
+    return [{"id": u.id, "username": u.username, "is_active": u.is_active, "created_at": u.created_at} for u in users]
+
+
+@router.post("/users", dependencies=[Depends(_get_current_admin)], status_code=201)
+async def create_user(body: UserCreate, db: AsyncSession = Depends(get_db)):
+    existing = await db.execute(select(AdminUser).where(AdminUser.username == body.username))
+    if existing.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Użytkownik o tej nazwie już istnieje")
+    user = AdminUser(username=body.username, password_hash=pwd_context.hash(body.password))
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return {"id": user.id, "username": user.username, "created_at": user.created_at}
+
+
+@router.delete("/users/{user_id}")
+async def delete_user(user_id: int, current_username: str = Depends(_get_current_admin), db: AsyncSession = Depends(get_db)):
+    user = await db.get(AdminUser, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Użytkownik nie istnieje")
+    if user.username == current_username:
+        raise HTTPException(status_code=400, detail="Nie możesz usunąć własnego konta")
+    await db.delete(user)
+    await db.commit()
+    return {"deleted": user_id}
+
+
+@router.put("/users/{user_id}/password", dependencies=[Depends(_get_current_admin)])
+async def change_password(user_id: int, body: PasswordChange, db: AsyncSession = Depends(get_db)):
+    user = await db.get(AdminUser, user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="Użytkownik nie istnieje")
+    user.password_hash = pwd_context.hash(body.new_password)
+    await db.commit()
+    return {"status": "ok"}
 
 
 # ---------- Categories ----------
