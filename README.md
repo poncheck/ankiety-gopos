@@ -103,6 +103,14 @@ Przy pierwszym uruchomieniu Docker pobiera obrazy i buduje kontenery. Migracje b
 | API (docs Swagger) | http://localhost:8000/docs |
 | Health check | http://localhost:8000/health |
 
+### Szybka aktualizacja (po pobraniu nowego kodu z GitHub)
+
+```bash
+./update.sh
+```
+
+Skrypt wykonuje kolejno: `git pull` → `docker compose up --build -d` → sprawdzenie statusu kontenerów → ostatnie logi backendu.
+
 ### 4. Zatrzymanie
 
 ```bash
