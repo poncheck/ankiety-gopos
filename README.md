@@ -263,6 +263,31 @@ ankiety/
 
 ---
 
+## Logika doboru pytań
+
+Każdy produkt na paragonie ma przypisaną kategorię, a każda kategoria posiada pulę aktywnych pytań. Przy wyświetlaniu ankiety pytania dobierane są **losowo** z zachowaniem limitu **20 pytań na cały paragon**.
+
+### Algorytm dystrybucji
+
+1. **Zbieranie pul** — dla każdego produktu pobierana jest lista wszystkich aktywnych pytań jego kategorii.
+2. **Równomierny przydział** — 20 slotów dzielone jest równo między produkty posiadające pytania (reszta z dzielenia trafia do pierwszych produktów na liście).
+3. **Losowe próbkowanie** — z puli danej kategorii losowanych jest tyle pytań, ile wynosi przydział (lub mniej, jeśli kategoria ma mniej pytań niż przydział).
+4. **Redystrybucja niewykorzystanych slotów** — jeżeli produkt miał mniej pytań niż jego przydział, wolne sloty trafiają do innych produktów, które mają jeszcze dostępne pytania w puli.
+
+### Przykłady
+
+| Produkty na paragonie | Przydział slotów | Efekt |
+|-----------------------|-----------------|-------|
+| 1 produkt | 20 pytań | Do 20 losowych pytań z kategorii produktu |
+| 2 produkty | 10 + 10 | Do 10 losowych pytań dla każdego produktu |
+| 4 produkty | 5 + 5 + 5 + 5 | Do 5 losowych pytań dla każdego produktu |
+| 5 produktów | 4 + 4 + 4 + 4 + 4 | Do 4 losowych pytań dla każdego produktu |
+| 3 produkty (1 ma tylko 2 pytania) | 7 + 7 + 6 → redystrybucja | Produkt z 2 pytaniami dostaje 2, wolne 5 slotów trafia do pozostałych |
+
+> Pytania bez przypisanej kategorii nie dostają żadnych pytań i są pomijane przy obliczaniu przydziału.
+
+---
+
 ## API — endpointy
 
 ### Publiczne (bez uwierzytelniania)
@@ -451,6 +476,9 @@ Pełna dokumentacja interaktywna (Swagger UI): http://localhost:8000/docs
 ---
 
 ## Changelog
+
+### 2026-05-13
+- **Limit 20 pytań na paragon** — niezależnie od liczby produktów łączna liczba pytań w jednej ankiecie nie przekracza 20. Pytania są dobierane losowo z puli aktywnych pytań każdej kategorii i rozdzielane równomiernie między produkty (np. 5 produktów → 4 pytania każdy). Gdy paragon zawiera tylko jeden produkt, klient dostaje 20 losowo wybranych pytań z kategorii tego produktu. Jeśli jakiś produkt ma mniej pytań niż jego przydział, nadmiarowe sloty trafiają automatycznie do pozostałych produktów.
 
 ### 2026-04-24
 - **Zarządzanie użytkownikami w panelu admina** — tworzenie/usuwanie kont adminów, zmiana haseł bezpośrednio z UI

@@ -11,7 +11,7 @@ from app.models.db import Answer, ProductCache, Question, SurveyResponse
 from app.models.survey import BillResponse, Product, SurveySubmission
 from app.services.email import send_survey_code
 from app.services.gopos import get_bill
-from app.services.questions import get_questions_for_product
+from app.services.questions import select_questions_for_bill
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -60,8 +60,9 @@ async def fetch_bill(bill_number: str, db: AsyncSession = Depends(get_db)):
 
     await db.commit()
 
+    distributed = await select_questions_for_bill(bill.products, db)
     for product in bill.products:
-        product.questions = await get_questions_for_product(product.gopos_product_id, db)
+        product.questions = distributed.get(product.id, [])
 
     return bill
 
