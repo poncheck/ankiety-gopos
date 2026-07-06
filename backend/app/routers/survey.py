@@ -107,6 +107,7 @@ async def submit_survey(submission: SurveySubmission, db: AsyncSession = Depends
 
     await db.commit()
 
+    logger.info("Paragon %s — email: %s, kod: %s", submission.bill_number, submission.email or "(brak)", code)
     if submission.email:
         try:
             await send_survey_code(submission.email, code)
