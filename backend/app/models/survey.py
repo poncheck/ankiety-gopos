@@ -22,6 +22,7 @@ class BillResponse(BaseModel):
     bill_number: str
     products: list[Product]
     already_submitted: bool = False
+    survey_token: str | None = None
 
 
 class SurveyAnswer(BaseModel):
@@ -36,3 +37,4 @@ class SurveySubmission(BaseModel):
     email: str | None = Field(None, max_length=255)
     marketing_consent: bool = False
     answers: list[SurveyAnswer] = Field(..., max_length=200)
+    survey_token: str | None = None

@@ -5,10 +5,13 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from passlib.context import CryptContext
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import select, text
 
 from app.config import settings
 from app.database import Base, AsyncSessionLocal, engine
+from app.limiter import limiter
 from app.models.db import AdminUser
 from app.routers import admin, survey
 from app.routers import settings as settings_router
@@ -79,6 +82,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Ankiety GoPOS", version="0.1.0", lifespan=lifespan)
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,

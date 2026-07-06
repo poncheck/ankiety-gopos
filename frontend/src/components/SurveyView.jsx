@@ -282,7 +282,7 @@ export default function SurveyView({ bill, onDone }) {
           }
         }
       }
-      const result = await submitSurvey({ bill_number: bill.bill_number, email: email.trim(), marketing_consent: marketingConsent, answers: answerList });
+      const result = await submitSurvey({ bill_number: bill.bill_number, email: email.trim(), marketing_consent: marketingConsent, answers: answerList, survey_token: bill.survey_token });
       onDone(result.code);
     } catch (err) {
       setError(err.message);
