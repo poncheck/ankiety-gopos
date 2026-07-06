@@ -34,28 +34,34 @@ async def lifespan(app: FastAPI):
             text("ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS marketing_consent BOOLEAN NOT NULL DEFAULT false")
         )
 
-    # 2. Unique constraint na fiscal_ref_id — osobna transakcja, pomijamy jeśli są duplikaty
+    # 2. Unique constraint na fiscal_ref_id — usuń duplikaty (zostaw najnowszy), potem dodaj constraint
     try:
         async with engine.begin() as conn:
-            await conn.execute(
-                text("""
-                    DO $$
-                    BEGIN
-                        IF NOT EXISTS (
-                            SELECT 1 FROM pg_constraint
-                            WHERE conname = 'uq_survey_responses_fiscal_ref_id'
-                        ) THEN
-                            ALTER TABLE survey_responses
-                                ADD CONSTRAINT uq_survey_responses_fiscal_ref_id
-                                UNIQUE (fiscal_ref_id);
-                        END IF;
-                    END $$;
-                """)
-            )
+            # Usuń starsze duplikaty (zostaw rekord z najwyższym id dla każdego fiscal_ref_id)
+            await conn.execute(text("""
+                DELETE FROM survey_responses
+                WHERE id NOT IN (
+                    SELECT MAX(id) FROM survey_responses GROUP BY fiscal_ref_id
+                )
+            """))
+            # Dodaj constraint jeśli jeszcze nie istnieje
+            await conn.execute(text("""
+                DO $$
+                BEGIN
+                    IF NOT EXISTS (
+                        SELECT 1 FROM pg_constraint
+                        WHERE conname = 'uq_survey_responses_fiscal_ref_id'
+                    ) THEN
+                        ALTER TABLE survey_responses
+                            ADD CONSTRAINT uq_survey_responses_fiscal_ref_id
+                            UNIQUE (fiscal_ref_id);
+                    END IF;
+                END $$;
+            """))
     except Exception:
         import logging
         logging.getLogger(__name__).warning(
-            "Nie można dodać unique constraint na fiscal_ref_id — prawdopodobnie istnieją duplikaty w bazie."
+            "Nie można dodać unique constraint na fiscal_ref_id."
         )
 
     # 3. Seed pierwszego admina z .env jeśli tabela jest pusta
