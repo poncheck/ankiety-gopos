@@ -235,6 +235,25 @@ export default function SurveyView({ bill, onDone }) {
     setAnswers((prev) => ({ ...prev, [`${productId}_${questionId}`]: value }));
   }
 
+  const MIN_COMPLETION = 0.8;
+
+  function countQuestions() {
+    let total = 0;
+    let answered = 0;
+    for (const product of bill.products) {
+      for (const q of product.questions || []) {
+        total++;
+        const val = answers[`${product.id}_${q.id}`];
+        if (val !== undefined && val !== "") answered++;
+      }
+    }
+    return { total, answered };
+  }
+
+  const { total: totalQ, answered: answeredQ } = countQuestions();
+  const completion = totalQ > 0 ? answeredQ / totalQ : 1;
+  const missingQ = Math.ceil(totalQ * MIN_COMPLETION) - answeredQ;
+
   async function handleSubmit() {
     if (!email.trim()) {
       setError("Podaj adres e-mail, aby otrzymać kod rabatowy.");
@@ -242,6 +261,13 @@ export default function SurveyView({ bill, onDone }) {
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
       setError("Podaj poprawny adres e-mail.");
+      return;
+    }
+    if (completion < MIN_COMPLETION) {
+      setError(
+        `Aby otrzymać upominek, wypełnij co najmniej 80% ankiety. ` +
+        `Brakuje jeszcze ${missingQ} ${missingQ === 1 ? "odpowiedzi" : "odpowiedzi"}.`
+      );
       return;
     }
     setSubmitting(true);
@@ -326,10 +352,39 @@ export default function SurveyView({ bill, onDone }) {
         </label>
       </div>
 
+      {totalQ > 0 && (
+        <div style={{ marginTop: "1.25rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8rem", color: "#6b7280", marginBottom: "0.35rem" }}>
+            <span>Wypełniono: {answeredQ} / {totalQ} pytań</span>
+            <span style={{ color: completion >= MIN_COMPLETION ? "#16a34a" : "#d97706", fontWeight: 600 }}>
+              {Math.round(completion * 100)}%
+            </span>
+          </div>
+          <div style={{ height: "6px", background: "#e5e7eb", borderRadius: "99px", overflow: "hidden" }}>
+            <div style={{
+              height: "100%",
+              width: `${Math.round(completion * 100)}%`,
+              background: completion >= MIN_COMPLETION ? "#16a34a" : "#f59e0b",
+              borderRadius: "99px",
+              transition: "width 0.2s",
+            }} />
+          </div>
+          {completion < MIN_COMPLETION && (
+            <p style={{ fontSize: "0.8rem", color: "#d97706", marginTop: "0.35rem" }}>
+              Aby otrzymać upominek, wypełnij jeszcze {missingQ} {missingQ === 1 ? "pytanie" : "pytania/pytań"} (min. 80%).
+            </p>
+          )}
+        </div>
+      )}
+
       {error && <p style={styles.error}>{error}</p>}
 
       <button
-        style={styles.submitBtn}
+        style={{
+          ...styles.submitBtn,
+          background: completion >= MIN_COMPLETION ? "#16a34a" : "#9ca3af",
+          cursor: completion >= MIN_COMPLETION ? "pointer" : "not-allowed",
+        }}
         onClick={handleSubmit}
         disabled={submitting}
       >
