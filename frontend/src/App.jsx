@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import ReceiptForm from "./components/ReceiptForm.jsx";
 import SurveyView from "./components/SurveyView.jsx";
+import BarcodeDisplay from "./components/BarcodeDisplay.jsx";
 import { fetchBill } from "./api/survey.js";
 import LoginPage from "./admin/LoginPage.jsx";
 import AdminLayout from "./admin/AdminLayout.jsx";
@@ -55,21 +56,12 @@ function SurveyApp() {
             padding: "1.5rem",
             marginBottom: "1rem",
           }}>
-            <p style={{ color: "#15803d", fontWeight: 600, marginBottom: "0.5rem" }}>
+            <p style={{ color: "#15803d", fontWeight: 600, marginBottom: "1rem" }}>
               Twój kod rabatowy:
             </p>
-            <span style={{
-              fontSize: "2.2rem",
-              fontWeight: 800,
-              letterSpacing: "0.15em",
-              color: "#15803d",
-              display: "block",
-              marginBottom: "0.75rem",
-            }}>
-              {surveyCode}
-            </span>
-            <p style={{ color: "#6b7280", fontSize: "0.85rem" }}>
-              Kod został też wysłany na Twój adres e-mail. Okaż go przy kolejnej wizycie.
+            <BarcodeDisplay value={surveyCode} />
+            <p style={{ color: "#6b7280", fontSize: "0.85rem", marginTop: "1rem" }}>
+              Pokaż kod kasjerowi lub zeskanuj przy kasie. Kod został też wysłany na Twój adres e-mail.
             </p>
           </div>
         )}
