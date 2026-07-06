@@ -73,7 +73,6 @@ def _barcode_png(code: str, module_px: int = 2, height: int = 80, quiet_px: int 
     for bit in bits:
         row.extend([0 if bit == "1" else 255] * module_px)
     row.extend([255] * quiet_px)
-    assert len(row) == width, f"row={len(row)} != width={width}"
 
     # Dane obrazu: dla każdego wiersza bajt filtra (0) + piksele
     scanline = b"\x00" + bytes(row)
@@ -97,8 +96,12 @@ async def send_survey_code(to_email: str, code: str) -> None:
         logger.warning("SMTP nie skonfigurowany — kod %s nie zostanie wysłany na %s", code, to_email)
         return
 
-    # Generuj PNG kodu kreskowego
-    barcode_png = _barcode_png(code)
+    # Generuj PNG kodu kreskowego (None = fallback do maila bez obrazka)
+    try:
+        barcode_png = _barcode_png(code)
+    except Exception:
+        logger.warning("Nie udało się wygenerować barcode PNG dla kodu %s", code)
+        barcode_png = None
     cid = "barcode_img"
 
     html_body = f"""\
@@ -146,21 +149,33 @@ Pozdrawiamy,
 Zespół restauracji
 """
 
-    # Struktura: multipart/related zawiera HTML + inline obraz PNG
-    msg_root = MIMEMultipart("related")
-    msg_root["Subject"] = "Twój kod rabatowy — dziękujemy za wypełnienie ankiety!"
-    msg_root["From"] = settings.smtp_from or settings.smtp_username or "noreply@ankiety"
-    msg_root["To"] = to_email
+    subject = "Twój kod rabatowy — dziękujemy za wypełnienie ankiety!"
+    from_addr = settings.smtp_from or settings.smtp_username or "noreply@ankiety"
 
-    msg_alt = MIMEMultipart("alternative")
-    msg_alt.attach(MIMEText(text_body, "plain", "utf-8"))
-    msg_alt.attach(MIMEText(html_body, "html", "utf-8"))
-    msg_root.attach(msg_alt)
+    if barcode_png:
+        # multipart/related: HTML z osadzonym obrazkiem CID
+        msg_root = MIMEMultipart("related")
+        msg_root["Subject"] = subject
+        msg_root["From"] = from_addr
+        msg_root["To"] = to_email
 
-    img = MIMEImage(barcode_png, "png")
-    img.add_header("Content-ID", f"<{cid}>")
-    img.add_header("Content-Disposition", "inline", filename="kod_rabatowy.png")
-    msg_root.attach(img)
+        msg_alt = MIMEMultipart("alternative")
+        msg_alt.attach(MIMEText(text_body, "plain", "utf-8"))
+        msg_alt.attach(MIMEText(html_body, "html", "utf-8"))
+        msg_root.attach(msg_alt)
+
+        img = MIMEImage(barcode_png, "png")
+        img.add_header("Content-ID", f"<{cid}>")
+        img.add_header("Content-Disposition", "inline", filename="kod_rabatowy.png")
+        msg_root.attach(img)
+    else:
+        # Fallback: zwykły multipart/alternative bez obrazka
+        msg_root = MIMEMultipart("alternative")
+        msg_root["Subject"] = subject
+        msg_root["From"] = from_addr
+        msg_root["To"] = to_email
+        msg_root.attach(MIMEText(text_body, "plain", "utf-8"))
+        msg_root.attach(MIMEText(html_body, "html", "utf-8"))
 
     use_ssl = settings.smtp_port == 465
     try:

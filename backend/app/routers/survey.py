@@ -108,7 +108,10 @@ async def submit_survey(submission: SurveySubmission, db: AsyncSession = Depends
     await db.commit()
 
     if submission.email:
-        await send_survey_code(submission.email, code)
+        try:
+            await send_survey_code(submission.email, code)
+        except Exception:
+            logger.exception("Błąd wysyłki emaila dla paragonu %s", submission.bill_number)
 
     return {
         "status": "ok",
