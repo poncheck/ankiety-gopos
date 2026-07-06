@@ -10,6 +10,7 @@ from app.database import get_db
 from app.models.db import Answer, ProductCache, Question, SurveyResponse
 from app.models.survey import BillResponse, Product, SurveySubmission
 from app.services.email import send_survey_code
+from app.services.gocrm import create_voucher
 from app.services.gopos import get_bill
 from app.services.questions import select_questions_for_bill
 
@@ -20,7 +21,7 @@ _CODE_CHARS = string.ascii_uppercase + string.digits
 _CODE_LENGTH = 8
 
 
-def _generate_code() -> str:
+def _generate_fallback_code() -> str:
     return "".join(secrets.choice(_CODE_CHARS) for _ in range(_CODE_LENGTH))
 
 
@@ -76,7 +77,8 @@ async def submit_survey(submission: SurveySubmission, db: AsyncSession = Depends
     if existing.scalar_one_or_none() is not None:
         raise HTTPException(status_code=409, detail="Ankieta dla tego paragonu została już wypełniona")
 
-    code = _generate_code()
+    crm_code = await create_voucher(source_reference_id=submission.bill_number)
+    code = crm_code or _generate_fallback_code()
 
     survey_response = SurveyResponse(
         fiscal_ref_id=submission.bill_number,

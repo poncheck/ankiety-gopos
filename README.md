@@ -166,6 +166,10 @@ Wszystkie wartości definiujesz w pliku `.env` (na podstawie `.env.example`).
 |---------|----------|------|
 | `GOPOS_BASE_URL` | `https://app.gopos.io` | URL API GoPOS |
 | `ALLOWED_HOST` | — | Domena serwera dla Vite (np. `ankieta.cukru.cafe`) — wymagane gdy Vite zgłasza "Blocked request" |
+| `CRM_CLIENT_ID` | — | OAuth2 Client ID z panelu GoCRM (crm.gopos.io → Ustawienia → API) |
+| `CRM_CLIENT_SECRET` | — | OAuth2 Client Secret z panelu GoCRM |
+| `CRM_ORGANIZATION_ID` | — | ID organizacji w GoCRM (inne niż ID w GoPOS!) |
+| `CRM_VOUCHER_PRODUCT_ID` | `4` | ID szablonu vouchera w GoCRM — musi istnieć w panelu GoCRM |
 | `SMTP_HOST` | — | Serwer SMTP (jeśli pusty, e-maile nie są wysyłane) |
 | `SMTP_PORT` | `587` | Port SMTP (`465` = SSL, `587` = STARTTLS) |
 | `SMTP_USERNAME` | — | Login SMTP |
@@ -484,6 +488,9 @@ Pełna dokumentacja interaktywna (Swagger UI): http://localhost:8000/docs
 ---
 
 ## Changelog
+
+### 2026-05-18
+- **Integracja z GoCRM** — po wypełnieniu ankiety system tworzy prawdziwy voucher w GoCRM (API `POST /api/organizations/{id}/vouchers`) zamiast generować losowy kod. Kod vouchera pochodzi z GoCRM i może być od razu zeskanowany przez kasjera. Jeśli zmienne `CRM_*` nie są ustawione lub API jest niedostępne — fallback do losowego kodu (brak przerwy w działaniu). Nowe zmienne: `CRM_CLIENT_ID`, `CRM_CLIENT_SECRET`, `CRM_ORGANIZATION_ID`, `CRM_VOUCHER_PRODUCT_ID`.
 
 ### 2026-05-13
 - **Limit 20 pytań na paragon** — niezależnie od liczby produktów łączna liczba pytań w jednej ankiecie nie przekracza 20. Pytania są dobierane losowo z puli aktywnych pytań każdej kategorii i rozdzielane równomiernie między produkty (np. 5 produktów → 4 pytania każdy). Gdy paragon zawiera tylko jeden produkt, klient dostaje 20 losowo wybranych pytań z kategorii tego produktu. Jeśli jakiś produkt ma mniej pytań niż jego przydział, nadmiarowe sloty trafiają automatycznie do pozostałych produktów.

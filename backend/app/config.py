@@ -19,6 +19,13 @@ class Settings(BaseSettings):
     smtp_from: str | None = None
     smtp_tls: bool = True
 
+    # GoCRM — generowanie voucherów po wypełnieniu ankiety (opcjonalne)
+    crm_client_id: str | None = None
+    crm_client_secret: str | None = None
+    crm_organization_id: str | None = None
+    crm_base_url: str = "https://crm.gopos.io"
+    crm_voucher_product_id: int = 4
+
     class Config:
         env_file = ".env"
 
