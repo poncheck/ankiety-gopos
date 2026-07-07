@@ -69,6 +69,45 @@ function SurveyApp() {
     );
   }
 
+  if (bill?.already_submitted) {
+    return (
+      <div style={{ textAlign: "center", maxWidth: "480px", margin: "0 auto" }}>
+        <div style={{
+          background: "#fefce8",
+          border: "2px solid #fde047",
+          borderRadius: "12px",
+          padding: "2rem",
+          marginBottom: "1rem",
+        }}>
+          <div style={{ fontSize: "2.5rem", marginBottom: "0.75rem" }}>⚠️</div>
+          <h2 style={{ fontSize: "1.2rem", color: "#854d0e", marginBottom: "0.5rem" }}>
+            Ankieta już wypełniona
+          </h2>
+          <p style={{ color: "#713f12", fontSize: "0.9rem" }}>
+            Paragon <strong>#{bill.bill_number}</strong> został już wykorzystany do ankiety.
+            Każdy paragon można ocenić tylko raz.
+          </p>
+        </div>
+        <button
+          style={{
+            marginTop: "0.5rem",
+            padding: "0.6rem 1.5rem",
+            borderRadius: "8px",
+            border: "none",
+            background: "#e5e7eb",
+            color: "#374151",
+            fontSize: "0.9rem",
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
+          onClick={() => setBill(null)}
+        >
+          Wróć
+        </button>
+      </div>
+    );
+  }
+
   if (bill) {
     return <SurveyView bill={bill} onDone={(code) => { setSurveyCode(code); setSubmitted(true); }} />;
   }
