@@ -4,6 +4,7 @@ import zlib
 from email.mime.image import MIMEImage
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
+from email.utils import formatdate, make_msgid
 
 import aiosmtplib
 
@@ -152,12 +153,16 @@ Zespół restauracji
     subject = "Twój kod rabatowy — dziękujemy za wypełnienie ankiety!"
     from_addr = settings.smtp_from or settings.smtp_username or "noreply@ankiety"
 
+    domain = from_addr.split("@")[-1].split(">")[0] if "@" in from_addr else "ankiety"
+
     if barcode_png:
         # multipart/related: HTML z osadzonym obrazkiem CID
         msg_root = MIMEMultipart("related")
         msg_root["Subject"] = subject
         msg_root["From"] = from_addr
         msg_root["To"] = to_email
+        msg_root["Date"] = formatdate(localtime=True)
+        msg_root["Message-ID"] = make_msgid(domain=domain)
 
         msg_alt = MIMEMultipart("alternative")
         msg_alt.attach(MIMEText(text_body, "plain", "utf-8"))
@@ -174,6 +179,8 @@ Zespół restauracji
         msg_root["Subject"] = subject
         msg_root["From"] = from_addr
         msg_root["To"] = to_email
+        msg_root["Date"] = formatdate(localtime=True)
+        msg_root["Message-ID"] = make_msgid(domain=domain)
         msg_root.attach(MIMEText(text_body, "plain", "utf-8"))
         msg_root.attach(MIMEText(html_body, "html", "utf-8"))
 
@@ -266,11 +273,14 @@ async def send_survey_results(
 
     subject = f"Ankieta #{bill_number} — {len(answers)} odpowiedzi"
     from_addr = settings.smtp_from or settings.smtp_username or "noreply@ankiety"
+    domain = from_addr.split("@")[-1].split(">")[0] if "@" in from_addr else "ankiety"
 
     msg = MIMEMultipart("alternative")
     msg["Subject"] = subject
     msg["From"] = from_addr
     msg["To"] = settings.admin_email
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=domain)
     msg.attach(MIMEText(text_body, "plain", "utf-8"))
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
