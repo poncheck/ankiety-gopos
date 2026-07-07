@@ -14,7 +14,7 @@ from app.database import get_db
 from app.limiter import limiter
 from app.models.db import Answer, ProductCache, Question, SurveyResponse
 from app.models.survey import BillResponse, Product, SurveySubmission
-from app.services.email import send_survey_code
+from app.services.email import send_survey_code, send_survey_results
 from app.services.gocrm import create_voucher
 from app.services.gopos import get_bill
 from app.services.questions import select_questions_for_bill
@@ -136,6 +136,7 @@ async def submit_survey(submission: SurveySubmission, request: Request, db: Asyn
     db.add(survey_response)
     await db.flush()
 
+    answers_dicts = []
     for ans in submission.answers:
         q_result = await db.execute(select(Question).where(Question.id == ans.question_id))
         question = q_result.scalar_one_or_none()
@@ -149,15 +150,31 @@ async def submit_survey(submission: SurveySubmission, request: Request, db: Asyn
             question_text=question.text,
             value=str(ans.value),
         ))
+        answers_dicts.append({
+            "product_name": ans.product_name or ans.product_id,
+            "question_text": question.text,
+            "value": str(ans.value),
+        })
 
     await db.commit()
 
     logger.info("Paragon %s — email: %s, kod: %s", submission.bill_number, submission.email or "(brak)", code)
+
     if submission.email:
         try:
             await send_survey_code(submission.email, code)
         except Exception:
             logger.exception("Błąd wysyłki emaila dla paragonu %s", submission.bill_number)
+
+    try:
+        await send_survey_results(
+            bill_number=submission.bill_number,
+            customer_email=submission.email,
+            answers=answers_dicts,
+            code=code,
+        )
+    except Exception:
+        logger.exception("Błąd wysyłki wyników ankiety #%s", submission.bill_number)
 
     return {
         "status": "ok",

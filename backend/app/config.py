@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     smtp_password: str | None = None
     smtp_from: str | None = None
     smtp_tls: bool = True
+    admin_email: str | None = None
 
     # GoCRM — generowanie voucherów po wypełnieniu ankiety (opcjonalne)
     crm_client_id: str | None = None

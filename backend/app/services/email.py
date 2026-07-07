@@ -191,3 +191,100 @@ Zespół restauracji
         logger.info("Email z kodem %s (+ barcode PNG) wysłany na %s", code, to_email)
     except Exception:
         logger.exception("Błąd wysyłania emaila na %s", to_email)
+
+
+async def send_survey_results(
+    bill_number: str,
+    customer_email: str | None,
+    answers: list[dict],
+    code: str,
+) -> None:
+    """Wysyła podsumowanie wypełnionej ankiety na ADMIN_EMAIL z .env."""
+    if not settings.smtp_host:
+        return
+    if not settings.admin_email:
+        return
+
+    from datetime import datetime
+    now = datetime.now().strftime("%d.%m.%Y %H:%M")
+
+    # Grupuj odpowiedzi per produkt
+    products: dict[str, list[dict]] = {}
+    for ans in answers:
+        pname = ans.get("product_name") or ans.get("product_id") or "Nieznany produkt"
+        products.setdefault(pname, []).append(ans)
+
+    # Buduj HTML z tabelkami per produkt
+    products_html = ""
+    products_text = ""
+    for pname, panswers in products.items():
+        rows_html = ""
+        rows_text = f"\n  {pname}\n"
+        for a in panswers:
+            q = a.get("question_text") or f"Pytanie #{a.get('question_id')}"
+            v = a.get("value", "")
+            rows_html += (
+                f'<tr><td style="padding:6px 10px;border-bottom:1px solid #f3f4f6;color:#374151;font-size:0.875rem;">{q}</td>'
+                f'<td style="padding:6px 10px;border-bottom:1px solid #f3f4f6;font-weight:600;color:#111827;font-size:0.875rem;">{v}</td></tr>'
+            )
+            rows_text += f"    {q}: {v}\n"
+        products_html += (
+            f'<div style="margin-bottom:1.25rem;">'
+            f'<div style="font-size:0.8rem;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:#6b7280;margin-bottom:0.4rem;">{pname}</div>'
+            f'<table style="width:100%;border-collapse:collapse;background:#f9fafb;border-radius:8px;overflow:hidden;">{rows_html}</table>'
+            f'</div>'
+        )
+        products_text += rows_text
+
+    customer_line = customer_email if customer_email else "— (brak)"
+
+    html_body = (
+        '<!DOCTYPE html><html lang="pl"><head><meta charset="UTF-8"></head>'
+        '<body style="font-family:sans-serif;background:#f3f4f6;padding:1.5rem;">'
+        '<div style="max-width:560px;margin:0 auto;background:#fff;border-radius:12px;padding:2rem;box-shadow:0 2px 12px rgba(0,0,0,0.07);">'
+        f'<h1 style="font-size:1.2rem;color:#111827;margin-bottom:0.25rem;">Nowa ankieta — paragon #{bill_number}</h1>'
+        f'<p style="color:#6b7280;font-size:0.85rem;margin-bottom:1.5rem;">{now}</p>'
+        '<table style="width:100%;border-collapse:collapse;margin-bottom:1.5rem;">'
+        f'<tr><td style="padding:4px 0;color:#6b7280;font-size:0.8rem;width:140px;">Klient (e-mail)</td><td style="padding:4px 0;font-size:0.85rem;color:#111;">{customer_line}</td></tr>'
+        f'<tr><td style="padding:4px 0;color:#6b7280;font-size:0.8rem;">Kod rabatowy</td><td style="padding:4px 0;font-size:0.85rem;font-family:monospace;font-weight:700;color:#15803d;">{code}</td></tr>'
+        f'<tr><td style="padding:4px 0;color:#6b7280;font-size:0.8rem;">Liczba odpowiedzi</td><td style="padding:4px 0;font-size:0.85rem;color:#111;">{len(answers)}</td></tr>'
+        '</table>'
+        '<hr style="border:none;border-top:1px solid #e5e7eb;margin:1.25rem 0;">'
+        f'{products_html}'
+        '<p style="color:#9ca3af;font-size:0.75rem;text-align:center;margin-top:1.5rem;">Wiadomość automatyczna z systemu Ankiety GoPOS</p>'
+        '</div></body></html>'
+    )
+
+    text_body = (
+        f"Nowa ankieta — paragon #{bill_number}\n"
+        f"Data: {now}\n"
+        f"Klient: {customer_line}\n"
+        f"Kod rabatowy: {code}\n"
+        f"Liczba odpowiedzi: {len(answers)}\n\n"
+        f"Odpowiedzi:{products_text}"
+    )
+
+    subject = f"Ankieta #{bill_number} — {len(answers)} odpowiedzi"
+    from_addr = settings.smtp_from or settings.smtp_username or "noreply@ankiety"
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"] = from_addr
+    msg["To"] = settings.admin_email
+    msg.attach(MIMEText(text_body, "plain", "utf-8"))
+    msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+    use_ssl = settings.smtp_port == 465
+    try:
+        await aiosmtplib.send(
+            msg,
+            hostname=settings.smtp_host,
+            port=settings.smtp_port,
+            username=settings.smtp_username,
+            password=settings.smtp_password,
+            use_tls=use_ssl,
+            start_tls=(settings.smtp_tls and not use_ssl),
+        )
+        logger.info("Wyniki ankiety #%s wysłane na %s", bill_number, settings.admin_email)
+    except Exception:
+        logger.exception("Błąd wysyłania wyników ankiety #%s na %s", bill_number, settings.admin_email)
