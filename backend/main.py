@@ -37,17 +37,23 @@ async def lifespan(app: FastAPI):
             text("ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS marketing_consent BOOLEAN NOT NULL DEFAULT false")
         )
 
-    # 2. Unique constraint na fiscal_ref_id — usuń duplikaty (zostaw najnowszy), potem dodaj constraint
+    # 2. Unique constraint na fiscal_ref_id
+    #    WAŻNE: DELETE i ALTER TABLE muszą być w osobnych transakcjach.
+    #    Jeśli ALTER TABLE rzuci błąd, PostgreSQL cofa całą transakcję — w tym DELETE.
+    #    Rozdzielenie gwarantuje, że duplikaty są usunięte trwale przed próbą dodania constraint.
+    async with engine.begin() as conn:
+        await conn.execute(text("""
+            DELETE FROM survey_responses
+            WHERE id NOT IN (
+                SELECT MAX(id) FROM survey_responses
+                WHERE fiscal_ref_id IS NOT NULL
+                GROUP BY fiscal_ref_id
+            )
+            AND fiscal_ref_id IS NOT NULL
+        """))
+
     try:
         async with engine.begin() as conn:
-            # Usuń starsze duplikaty (zostaw rekord z najwyższym id dla każdego fiscal_ref_id)
-            await conn.execute(text("""
-                DELETE FROM survey_responses
-                WHERE id NOT IN (
-                    SELECT MAX(id) FROM survey_responses GROUP BY fiscal_ref_id
-                )
-            """))
-            # Dodaj constraint jeśli jeszcze nie istnieje
             await conn.execute(text("""
                 DO $$
                 BEGIN
