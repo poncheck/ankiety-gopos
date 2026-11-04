@@ -3,9 +3,29 @@ import random
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.db import ProductCache, Question
+from app.models.db import Category, ProductCache, Question
 
 MAX_QUESTIONS_PER_RECEIPT = 20
+
+
+async def get_excluded_product_ids(db: AsyncSession) -> set[int]:
+    """Zwraca gopos_product_id wszystkich produktów, których kategoria jest
+    oznaczona jako wykluczona z ankiety (np. opakowania na wynos)."""
+    result = await db.execute(
+        select(ProductCache.gopos_product_id)
+        .join(Category, Category.id == ProductCache.category_id)
+        .where(Category.excluded_from_survey == True)  # noqa: E712
+    )
+    return {row[0] for row in result.all()}
+
+
+async def filter_excluded_products(products, db: AsyncSession):
+    """Usuwa z listy produkty należące do wykluczonej kategorii — nie będą
+    w ogóle widoczne w ankiecie klienta (nie tylko bez pytań)."""
+    excluded_ids = await get_excluded_product_ids(db)
+    if not excluded_ids:
+        return products
+    return [p for p in products if p.gopos_product_id not in excluded_ids]
 
 
 async def get_questions_for_product(

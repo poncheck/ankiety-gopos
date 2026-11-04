@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getCategories, syncCategories } from "./api/admin.js";
+import { getCategories, syncCategories, updateCategoryExclusion } from "./api/admin.js";
 
 const s = {
   header: { display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" },
@@ -21,6 +21,9 @@ const s = {
   link: { color: "#2563eb", textDecoration: "none", fontWeight: 500 },
   msg: { marginTop: "1rem", padding: "0.75rem", borderRadius: "8px", background: "#dcfce7", color: "#166534", fontSize: "0.875rem" },
   err: { marginTop: "1rem", padding: "0.75rem", borderRadius: "8px", background: "#fee2e2", color: "#991b1b", fontSize: "0.875rem" },
+  excludedRow: { opacity: 0.6 },
+  toggle: { display: "flex", alignItems: "center", gap: "0.4rem", cursor: "pointer", fontSize: "0.8rem", color: "#64748b" },
+  badge: { background: "#fef3c7", color: "#92400e", fontSize: "0.7rem", fontWeight: 700, padding: "0.15rem 0.5rem", borderRadius: "999px", marginLeft: "0.5rem" },
 };
 
 export default function CategoriesPage() {
@@ -55,6 +58,16 @@ export default function CategoriesPage() {
     }
   }
 
+  async function handleToggleExclusion(cat) {
+    setError(null);
+    try {
+      await updateCategoryExclusion(cat.id, !cat.excluded_from_survey);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   return (
     <div>
       <div style={s.header}>
@@ -67,26 +80,45 @@ export default function CategoriesPage() {
       {syncMsg && <div style={s.msg}>{syncMsg}</div>}
       {error && <div style={s.err}>{error}</div>}
 
+      <p style={{ fontSize: "0.8rem", color: "#6b7280", marginBottom: "1rem" }}>
+        Kategorie oznaczone jako „wykluczone” (np. opakowania na wynos) nie są pokazywane
+        klientom do oceny w ankiecie — ich pytania pozostają zapisane, ale nieaktywne.
+      </p>
+
       <table style={s.table}>
         <thead>
           <tr>
             <th style={s.th}>Nazwa</th>
             <th style={s.th}>GoPOS ID</th>
             <th style={s.th}>Pytania</th>
+            <th style={s.th}>W ankiecie</th>
             <th style={s.th}></th>
           </tr>
         </thead>
         <tbody>
           {categories.length === 0 && (
             <tr>
-              <td style={s.td} colSpan={4} align="center">Brak kategorii — kliknij Synchronizuj</td>
+              <td style={s.td} colSpan={5} align="center">Brak kategorii — kliknij Synchronizuj</td>
             </tr>
           )}
           {categories.map((cat) => (
-            <tr key={cat.id}>
-              <td style={s.td}>{cat.name}</td>
+            <tr key={cat.id} style={cat.excluded_from_survey ? s.excludedRow : undefined}>
+              <td style={s.td}>
+                {cat.name}
+                {cat.excluded_from_survey && <span style={s.badge}>wykluczona</span>}
+              </td>
               <td style={s.td}>{cat.gopos_id}</td>
               <td style={s.td}>{cat.question_count}</td>
+              <td style={s.td}>
+                <label style={s.toggle}>
+                  <input
+                    type="checkbox"
+                    checked={!cat.excluded_from_survey}
+                    onChange={() => handleToggleExclusion(cat)}
+                  />
+                  {cat.excluded_from_survey ? "Nie pokazuj" : "Pokazuj"}
+                </label>
+              </td>
               <td style={s.td}>
                 <Link to={`/admin/categories/${cat.id}/questions`} style={s.link}>
                   Zarządzaj pytaniami

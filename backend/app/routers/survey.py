@@ -17,7 +17,7 @@ from app.models.survey import BillResponse, Product, SurveySubmission
 from app.services.email import send_survey_code, send_survey_results
 from app.services.gocrm import create_voucher
 from app.services.gopos import get_bill
-from app.services.questions import select_questions_for_bill
+from app.services.questions import filter_excluded_products, select_questions_for_bill
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -83,6 +83,10 @@ async def fetch_bill(bill_number: str, request: Request, db: AsyncSession = Depe
         await _ensure_product_in_cache(product, db)
 
     await db.commit()
+
+    # Produkty z wykluczonych kategorii (np. opakowania na wynos) nie są
+    # pokazywane klientowi w ankiecie wcale.
+    bill.products = await filter_excluded_products(bill.products, db)
 
     distributed = await select_questions_for_bill(bill.products, db)
     for product in bill.products:

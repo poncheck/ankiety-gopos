@@ -151,6 +151,7 @@ async def list_categories(db: AsyncSession = Depends(get_db)):
             Category.id,
             Category.gopos_id,
             Category.name,
+            Category.excluded_from_survey,
             Category.created_at,
             func.count(Question.id).label("question_count"),
         )
@@ -164,6 +165,7 @@ async def list_categories(db: AsyncSession = Depends(get_db)):
             "id": r.id,
             "gopos_id": r.gopos_id,
             "name": r.name,
+            "excluded_from_survey": r.excluded_from_survey,
             "created_at": r.created_at,
             "question_count": r.question_count,
         }
@@ -175,6 +177,22 @@ async def list_categories(db: AsyncSession = Depends(get_db)):
 async def sync_categories_endpoint(db: AsyncSession = Depends(get_db)):
     added, updated = await sync_categories(db)
     return {"added": added, "updated": updated}
+
+
+class CategoryExclusionUpdate(BaseModel):
+    excluded_from_survey: bool
+
+
+@router.put("/categories/{category_id}/exclusion", dependencies=[Depends(_get_current_admin)])
+async def update_category_exclusion(category_id: int, body: CategoryExclusionUpdate, db: AsyncSession = Depends(get_db)):
+    """Włącza/wyłącza wykluczenie kategorii z ankiety — produkty tej kategorii
+    (np. opakowania na wynos) przestają być pokazywane klientowi do oceny."""
+    cat = await db.get(Category, category_id)
+    if not cat:
+        raise HTTPException(status_code=404, detail="Kategoria nie istnieje")
+    cat.excluded_from_survey = body.excluded_from_survey
+    await db.commit()
+    return {"id": cat.id, "excluded_from_survey": cat.excluded_from_survey}
 
 
 # ---------- Questions ----------

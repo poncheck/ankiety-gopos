@@ -36,6 +36,9 @@ async def lifespan(app: FastAPI):
         await conn.execute(
             text("ALTER TABLE survey_responses ADD COLUMN IF NOT EXISTS marketing_consent BOOLEAN NOT NULL DEFAULT false")
         )
+        await conn.execute(
+            text("ALTER TABLE categories ADD COLUMN IF NOT EXISTS excluded_from_survey BOOLEAN NOT NULL DEFAULT false")
+        )
 
     # 2. Unique constraint na fiscal_ref_id
     #    WAŻNE: DELETE i ALTER TABLE muszą być w osobnych transakcjach.
