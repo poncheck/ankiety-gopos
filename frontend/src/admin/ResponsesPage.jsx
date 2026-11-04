@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { getResponses, getProductStats, getMarketingEmails } from "./api/admin.js";
+import { getResponses, getProductStats, getMarketingEmails, deleteResponse, bulkDeleteResponses } from "./api/admin.js";
 
 // ─── Style ────────────────────────────────────────────────────────────────────
 
@@ -82,6 +82,18 @@ const s = {
   pagination: { display: "flex", gap: "0.5rem", marginTop: "1rem", justifyContent: "flex-end" },
   pgBtn: { border: "1.5px solid #d1d5db", borderRadius: "6px", padding: "0.35rem 0.8rem", cursor: "pointer", background: "#fff", fontSize: "0.875rem" },
   pgBtnActive: { border: "1.5px solid #2563eb", borderRadius: "6px", padding: "0.35rem 0.8rem", cursor: "pointer", background: "#2563eb", color: "#fff", fontSize: "0.875rem" },
+
+  // Date filter / cleanup bar
+  filterBar: {
+    display: "flex", alignItems: "center", gap: "0.6rem", flexWrap: "wrap",
+    background: "#fff", borderRadius: "10px", padding: "0.85rem 1rem",
+    marginBottom: "1.25rem", boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
+  },
+  filterLabel: { fontSize: "0.8rem", fontWeight: 600, color: "#374151" },
+  dateInput: { padding: "0.4rem 0.6rem", border: "1.5px solid #d1d5db", borderRadius: "6px", fontSize: "0.85rem" },
+  clearBtn: { background: "none", border: "1.5px solid #d1d5db", borderRadius: "6px", padding: "0.4rem 0.8rem", cursor: "pointer", fontSize: "0.8rem", color: "#64748b" },
+  deleteRangeBtn: { background: "#dc2626", color: "#fff", border: "none", borderRadius: "6px", padding: "0.4rem 0.9rem", cursor: "pointer", fontSize: "0.8rem", fontWeight: 600, marginLeft: "auto" },
+  deleteRowBtn: { background: "#fee2e2", color: "#b91c1c", border: "none", borderRadius: "6px", padding: "0.3rem 0.65rem", cursor: "pointer", fontSize: "0.75rem", fontWeight: 600 },
 
   // Stats
   statCard: {
@@ -312,13 +324,58 @@ function ProductStatCard({ product }) {
 function ReceiptsTab() {
   const [data, setData] = useState({ total: 0, items: [] });
   const [page, setPage] = useState(0);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [error, setError] = useState(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteMsg, setDeleteMsg] = useState(null);
 
-  useEffect(() => {
-    getResponses(page).then(setData).catch((err) => setError(err.message));
-  }, [page]);
+  function load() {
+    getResponses(page, dateFrom, dateTo).then(setData).catch((err) => setError(err.message));
+  }
+
+  useEffect(() => { load(); }, [page, dateFrom, dateTo]);
 
   const totalPages = Math.ceil(data.total / 20);
+
+  async function handleDeleteOne(id) {
+    if (!confirm("Usunąć tę ankietę?")) return;
+    setError(null);
+    try {
+      await deleteResponse(id);
+      load();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function handleDeleteRange() {
+    if (!dateFrom && !dateTo) {
+      setError("Wybierz zakres dat przed usunięciem (np. żeby usunąć stare testowe odpowiedzi).");
+      return;
+    }
+    const label = `${dateFrom || "początku"} do ${dateTo || "teraz"}`;
+    if (!confirm(`Usunąć WSZYSTKIE ankiety z zakresu: ${label}? Tej operacji nie można odwrócić.`)) return;
+    setDeleting(true);
+    setError(null);
+    setDeleteMsg(null);
+    try {
+      const res = await bulkDeleteResponses(dateFrom, dateTo);
+      setDeleteMsg(`Usunięto ${res.deleted} ${res.deleted === 1 ? "ankietę" : "ankiet"}.`);
+      setPage(0);
+      load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
+  function clearFilter() {
+    setDateFrom("");
+    setDateTo("");
+    setPage(0);
+  }
 
   return (
     <>
@@ -326,8 +383,33 @@ function ReceiptsTab() {
         <h1 style={s.title}>Paragony z ankietami</h1>
         <span style={s.count}>({data.total})</span>
       </div>
+
+      <div style={s.filterBar}>
+        <span style={s.filterLabel}>Zakres dat:</span>
+        <input
+          type="date"
+          style={s.dateInput}
+          value={dateFrom}
+          onChange={(e) => { setDateFrom(e.target.value); setPage(0); }}
+        />
+        <span style={{ color: "#9ca3af" }}>—</span>
+        <input
+          type="date"
+          style={s.dateInput}
+          value={dateTo}
+          onChange={(e) => { setDateTo(e.target.value); setPage(0); }}
+        />
+        {(dateFrom || dateTo) && (
+          <button style={s.clearBtn} onClick={clearFilter}>Wyczyść filtr</button>
+        )}
+        <button style={s.deleteRangeBtn} onClick={handleDeleteRange} disabled={deleting}>
+          {deleting ? "Usuwanie…" : "🗑 Usuń ankiety z zakresu"}
+        </button>
+      </div>
+
+      {deleteMsg && <div style={s.msg}>{deleteMsg}</div>}
       {error && <p style={s.err}>{error}</p>}
-      {data.items.length === 0 && !error && <p style={s.empty}>Brak wypełnionych ankiet.</p>}
+      {data.items.length === 0 && !error && <p style={s.empty}>Brak wypełnionych ankiet w wybranym zakresie.</p>}
       {data.items.map((r) => (
         <div key={r.id} style={s.card}>
           <div style={s.receiptBadge}>
@@ -351,6 +433,7 @@ function ReceiptsTab() {
           <div style={s.right}>
             <span style={s.answerCount}>{r.answer_count} odp.</span>
             <Link to={`/admin/responses/${r.id}`} style={s.detailLink}>Szczegóły →</Link>
+            <button style={s.deleteRowBtn} onClick={() => handleDeleteOne(r.id)}>Usuń</button>
           </div>
         </div>
       ))}
@@ -371,23 +454,36 @@ function ReceiptsTab() {
 
 function StatsTab() {
   const [stats, setStats] = useState(null);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    getProductStats().then(setStats).catch((err) => setError(err.message));
-  }, []);
-
-  if (error) return <p style={s.err}>{error}</p>;
-  if (!stats) return <p style={{ color: "#6b7280" }}>Ładowanie...</p>;
-  if (stats.length === 0) return <p style={s.empty}>Brak danych — wypełnij pierwszą ankietę.</p>;
+    setStats(null);
+    getProductStats(dateFrom, dateTo).then(setStats).catch((err) => setError(err.message));
+  }, [dateFrom, dateTo]);
 
   return (
     <>
       <div style={s.header}>
         <h1 style={s.title}>Zestawienie wg produktów</h1>
-        <span style={s.count}>({stats.length} {stats.length === 1 ? "produkt" : "produktów"})</span>
+        {stats && <span style={s.count}>({stats.length} {stats.length === 1 ? "produkt" : "produktów"})</span>}
       </div>
-      {stats.map((product) => (
+
+      <div style={s.filterBar}>
+        <span style={s.filterLabel}>Zakres dat:</span>
+        <input type="date" style={s.dateInput} value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+        <span style={{ color: "#9ca3af" }}>—</span>
+        <input type="date" style={s.dateInput} value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+        {(dateFrom || dateTo) && (
+          <button style={s.clearBtn} onClick={() => { setDateFrom(""); setDateTo(""); }}>Wyczyść filtr</button>
+        )}
+      </div>
+
+      {error && <p style={s.err}>{error}</p>}
+      {!stats && !error && <p style={{ color: "#6b7280" }}>Ładowanie...</p>}
+      {stats && stats.length === 0 && <p style={s.empty}>Brak danych w wybranym zakresie.</p>}
+      {stats && stats.map((product) => (
         <ProductStatCard key={product.product_name} product={product} />
       ))}
     </>
