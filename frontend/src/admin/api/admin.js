@@ -52,9 +52,26 @@ export const updateQuestion = (id, body) =>
   apiFetch(`/questions/${id}`, { method: "PUT", body: JSON.stringify(body) });
 export const deleteQuestion = (id) => apiFetch(`/questions/${id}`, { method: "DELETE" });
 
-export const getResponses = (page = 0) => apiFetch(`/responses?page=${page}&size=20`);
+export const getResponses = (page = 0, dateFrom = "", dateTo = "") => {
+  const params = new URLSearchParams({ page, size: 20 });
+  if (dateFrom) params.set("date_from", dateFrom);
+  if (dateTo) params.set("date_to", dateTo);
+  return apiFetch(`/responses?${params.toString()}`);
+};
 export const getResponse = (id) => apiFetch(`/responses/${id}`);
-export const getProductStats = () => apiFetch("/stats/products");
+export const deleteResponse = (id) => apiFetch(`/responses/${id}`, { method: "DELETE" });
+export const bulkDeleteResponses = (dateFrom, dateTo, confirmAll = false) =>
+  apiFetch("/responses/bulk-delete", {
+    method: "POST",
+    body: JSON.stringify({ date_from: dateFrom || null, date_to: dateTo || null, confirm_all: confirmAll }),
+  });
+export const getProductStats = (dateFrom = "", dateTo = "") => {
+  const params = new URLSearchParams();
+  if (dateFrom) params.set("date_from", dateFrom);
+  if (dateTo) params.set("date_to", dateTo);
+  const qs = params.toString();
+  return apiFetch(`/stats/products${qs ? `?${qs}` : ""}`);
+};
 export const getMarketingEmails = () => apiFetch("/marketing-emails");
 
 // --- Settings helpers ---

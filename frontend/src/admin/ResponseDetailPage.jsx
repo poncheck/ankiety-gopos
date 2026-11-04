@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getResponse } from "./api/admin.js";
+import { getResponse, deleteResponse } from "./api/admin.js";
 
 const s = {
   header: { display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1.5rem" },
   backBtn: { background: "none", border: "1.5px solid #d1d5db", borderRadius: "8px", padding: "0.4rem 0.9rem", cursor: "pointer", fontSize: "0.875rem" },
+  deleteBtn: { background: "#fee2e2", color: "#b91c1c", border: "none", borderRadius: "8px", padding: "0.4rem 0.9rem", cursor: "pointer", fontSize: "0.875rem", fontWeight: 600, marginLeft: "auto" },
   title: { fontSize: "1.5rem", fontWeight: 700 },
   meta: {
     background: "#f8fafc",
@@ -83,6 +84,16 @@ export default function ResponseDetailPage() {
   if (error) return <p style={s.err}>{error}</p>;
   if (!response) return <p>Ładowanie...</p>;
 
+  async function handleDelete() {
+    if (!confirm("Usunąć tę ankietę? Tej operacji nie można odwrócić.")) return;
+    try {
+      await deleteResponse(response.id);
+      navigate("/admin/responses");
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   // Grupuj odpowiedzi po produkcie, zachowując kolejność pierwszego wystąpienia
   const productOrder = [];
   const byProduct = {};
@@ -102,6 +113,7 @@ export default function ResponseDetailPage() {
       <div style={s.header}>
         <button style={s.backBtn} onClick={() => navigate("/admin/responses")}>← Powrót</button>
         <h1 style={s.title}>Ankieta #{response.id}</h1>
+        <button style={s.deleteBtn} onClick={handleDelete}>🗑 Usuń ankietę</button>
       </div>
 
       <div style={s.meta}>

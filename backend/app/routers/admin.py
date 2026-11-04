@@ -9,7 +9,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from pydantic import BaseModel, Field
-from sqlalchemy import func, select
+from sqlalchemy import delete as sa_delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -293,17 +293,49 @@ async def delete_question(question_id: int, db: AsyncSession = Depends(get_db)):
 
 # ---------- Responses ----------
 
+def _parse_date_boundary(value: str | None, end_of_day: bool = False) -> datetime | None:
+    """Parsuje datę z query param (YYYY-MM-DD lub ISO datetime) na UTC datetime.
+    Przy end_of_day=True ustawia 23:59:59, żeby date_to było inclusive."""
+    if not value:
+        return None
+    try:
+        if len(value) == 10:  # YYYY-MM-DD
+            dt = datetime.strptime(value, "%Y-%m-%d")
+            if end_of_day:
+                dt = dt.replace(hour=23, minute=59, second=59, microsecond=999999)
+            return dt
+        return datetime.fromisoformat(value)
+    except ValueError:
+        raise HTTPException(422, f"Nieprawidłowy format daty: '{value}' — użyj YYYY-MM-DD")
+
+
+def _response_date_filters(date_from: str | None, date_to: str | None) -> list:
+    filters = []
+    df = _parse_date_boundary(date_from)
+    dt = _parse_date_boundary(date_to, end_of_day=True)
+    if df:
+        filters.append(SurveyResponse.created_at >= df)
+    if dt:
+        filters.append(SurveyResponse.created_at <= dt)
+    return filters
+
+
 @router.get("/responses", dependencies=[Depends(_get_current_admin)])
 async def list_responses(
     page: int = 0,
     size: int = 20,
+    date_from: str | None = None,
+    date_to: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    total_result = await db.execute(select(func.count(SurveyResponse.id)))
+    filters = _response_date_filters(date_from, date_to)
+
+    total_result = await db.execute(select(func.count(SurveyResponse.id)).where(*filters))
     total = total_result.scalar()
 
     result = await db.execute(
         select(SurveyResponse)
+        .where(*filters)
         .order_by(SurveyResponse.created_at.desc())
         .offset(page * size)
         .limit(size)
@@ -376,6 +408,47 @@ async def get_response(response_id: int, db: AsyncSession = Depends(get_db)):
     }
 
 
+@router.delete("/responses/{response_id}", dependencies=[Depends(_get_current_admin)])
+async def delete_response(response_id: int, db: AsyncSession = Depends(get_db)):
+    """Usuwa pojedynczą ankietę wraz z jej odpowiedziami (CASCADE)."""
+    r = await db.get(SurveyResponse, response_id)
+    if not r:
+        raise HTTPException(status_code=404, detail="Odpowiedź nie istnieje")
+    await db.delete(r)
+    await db.commit()
+    return {"deleted": response_id}
+
+
+class ResponsesBulkDelete(BaseModel):
+    date_from: str | None = None
+    date_to: str | None = None
+    confirm_all: bool = False
+
+
+@router.post("/responses/bulk-delete", dependencies=[Depends(_get_current_admin)])
+async def bulk_delete_responses(body: ResponsesBulkDelete, db: AsyncSession = Depends(get_db)):
+    """Usuwa WSZYSTKIE ankiety z danego zakresu dat (np. testowe odpowiedzi
+    z okresu wdrożenia). Jeśli nie podano żadnego zakresu, wymaga jawnego
+    potwierdzenia przez confirm_all=true — zabezpieczenie przed przypadkowym
+    wyczyszczeniem całej bazy ankiet."""
+    if not body.date_from and not body.date_to and not body.confirm_all:
+        raise HTTPException(
+            422,
+            "Nie podano zakresu dat — aby usunąć WSZYSTKIE ankiety, ustaw confirm_all=true",
+        )
+
+    filters = _response_date_filters(body.date_from, body.date_to)
+
+    count_result = await db.execute(select(func.count(SurveyResponse.id)).where(*filters))
+    count = count_result.scalar()
+
+    if count > 0:
+        await db.execute(sa_delete(SurveyResponse).where(*filters))
+        await db.commit()
+
+    return {"deleted": count, "date_from": body.date_from, "date_to": body.date_to}
+
+
 # ---------- Marketing emails ----------
 
 @router.get("/marketing-emails", dependencies=[Depends(_get_current_admin)])
@@ -395,14 +468,24 @@ async def marketing_emails(db: AsyncSession = Depends(get_db)):
 # ---------- Stats ----------
 
 @router.get("/stats/products", dependencies=[Depends(_get_current_admin)])
-async def product_stats(db: AsyncSession = Depends(get_db)):
-    """Zagregowane statystyki odpowiedzi per produkt i pytanie (wszystkie ankiety)."""
-    rows_result = await db.execute(
+async def product_stats(
+    date_from: str | None = None,
+    date_to: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """Zagregowane statystyki odpowiedzi per produkt i pytanie.
+    Opcjonalnie filtrowane po dacie wypełnienia ankiety (np. żeby wykluczyć
+    testowe odpowiedzi z okresu wdrożenia)."""
+    filters = _response_date_filters(date_from, date_to)
+    query = (
         select(Answer.product_name, Answer.question_text, Answer.value, func.count(Answer.id))
         .where(Answer.product_name != "")
-        .group_by(Answer.product_name, Answer.question_text, Answer.value)
-        .order_by(Answer.product_name, Answer.question_text, Answer.value)
     )
+    if filters:
+        query = query.join(SurveyResponse, SurveyResponse.id == Answer.response_id).where(*filters)
+    query = query.group_by(Answer.product_name, Answer.question_text, Answer.value) \
+        .order_by(Answer.product_name, Answer.question_text, Answer.value)
+    rows_result = await db.execute(query)
     rows = rows_result.all()
 
     # Buduj strukturę: {product_name: {question_text: {value: count}}}
