@@ -99,6 +99,8 @@ async function uploadFile(path, file) {
 export const getAdminSettings = () => apiFetch("/settings");
 export const updateInstructions = (text) =>
   apiFetch("/settings/instructions", { method: "PUT", body: JSON.stringify({ text }) });
+export const updateGlobalCategory = (categoryId) =>
+  apiFetch("/settings/global-category", { method: "PUT", body: JSON.stringify({ category_id: categoryId }) });
 export const uploadLogo = (file) => uploadFile("/settings/logo", file);
 export const deleteLogo = () => apiFetch("/settings/logo", { method: "DELETE" });
 export const uploadReceiptImage = (file) => uploadFile("/settings/receipt-image", file);

@@ -17,7 +17,7 @@ from app.models.survey import BillResponse, Product, SurveySubmission
 from app.services.email import send_survey_code, send_survey_results
 from app.services.gocrm import create_voucher
 from app.services.gopos import get_bill
-from app.services.questions import filter_excluded_products, select_questions_for_bill
+from app.services.questions import filter_excluded_products, get_global_category_settings, select_questions_for_bill
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -88,16 +88,27 @@ async def fetch_bill(bill_number: str, request: Request, db: AsyncSession = Depe
     # pokazywane klientowi w ankiecie wcale.
     bill.products = await filter_excluded_products(bill.products, db)
 
-    distributed = await select_questions_for_bill(bill.products, db)
+    # Kategoria zbiorcza (np. "Obsługa klienta") — jej pytania trafiają
+    # na koniec KAŻDEJ ankiety, niezależnie od zamówionych produktów.
+    global_category, global_questions = await get_global_category_settings(db)
+
+    distributed = await select_questions_for_bill(
+        bill.products, db,
+        exclude_category_id=global_category.id if global_category else None,
+    )
     for product in bill.products:
         product.questions = distributed.get(product.id, [])
+
+    if global_questions:
+        bill.general_questions = global_questions
+        bill.general_category_name = global_category.name
 
     # Podpisany token z listą pytań — weryfikowany przy submit
     all_qids = [
         q["id"] if isinstance(q, dict) else q.id
         for product in bill.products
         for q in product.questions
-    ]
+    ] + [q["id"] if isinstance(q, dict) else q.id for q in bill.general_questions]
     bill.survey_token = _create_survey_token(bill_number, all_qids)
 
     return bill
