@@ -12,6 +12,7 @@ class Category(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     gopos_id: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    excluded_from_survey: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     questions: Mapped[list["Question"]] = relationship(back_populates="category", cascade="all, delete-orphan")

@@ -42,6 +42,8 @@ export async function login(username, password) {
 
 export const getCategories = () => apiFetch("/categories");
 export const syncCategories = () => apiFetch("/categories/sync", { method: "POST" });
+export const updateCategoryExclusion = (id, excluded) =>
+  apiFetch(`/categories/${id}/exclusion`, { method: "PUT", body: JSON.stringify({ excluded_from_survey: excluded }) });
 
 export const getQuestions = (categoryId) => apiFetch(`/categories/${categoryId}/questions`);
 export const createQuestion = (categoryId, body) =>
