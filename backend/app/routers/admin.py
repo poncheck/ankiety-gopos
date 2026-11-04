@@ -439,11 +439,16 @@ async def bulk_delete_responses(body: ResponsesBulkDelete, db: AsyncSession = De
 
     filters = _response_date_filters(body.date_from, body.date_to)
 
-    count_result = await db.execute(select(func.count(SurveyResponse.id)).where(*filters))
-    count = count_result.scalar()
+    ids_result = await db.execute(select(SurveyResponse.id).where(*filters))
+    ids = [row[0] for row in ids_result.all()]
+    count = len(ids)
 
     if count > 0:
-        await db.execute(sa_delete(SurveyResponse).where(*filters))
+        # sa_delete to surowe DELETE bez ORM — nie wyzwala cascade z relacji,
+        # więc trzeba najpierw ręcznie usunąć powiązane odpowiedzi (answers),
+        # inaczej FK constraint rzuca błąd integralności (500).
+        await db.execute(sa_delete(Answer).where(Answer.response_id.in_(ids)))
+        await db.execute(sa_delete(SurveyResponse).where(SurveyResponse.id.in_(ids)))
         await db.commit()
 
     return {"deleted": count, "date_from": body.date_from, "date_to": body.date_to}
