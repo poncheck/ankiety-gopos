@@ -4,7 +4,7 @@ import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Request, Response, UploadFile, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -705,3 +705,67 @@ async def import_questions(request: Request, db: AsyncSession = Depends(get_db))
 
     await db.commit()
     return {"imported": imported, "skipped": skipped, "errors": errors}
+
+
+# ---------- Eksport pytań ----------
+
+def _format_question_type(q_type: str, options: list[str] | None) -> str:
+    """Odwraca _parse_question_type — zamienia typ pytania z powrotem na zapis tekstowy."""
+    if q_type == "rating":
+        return "ocena"
+    if q_type == "yesno":
+        return "tak/nie"
+    if q_type == "text":
+        return "tekst"
+    if q_type == "choice":
+        return f"wybor: {', '.join(options or [])}"
+    return q_type
+
+
+@router.get("/export/questions", dependencies=[Depends(_get_current_admin)])
+async def export_questions(db: AsyncSession = Depends(get_db)):
+    """Eksportuje wszystkie pytania ze wszystkich kategorii do pliku .txt
+    w formacie identycznym z importem — plik można od razu wgrać ponownie."""
+    cats_result = await db.execute(select(Category).order_by(Category.name))
+    categories = cats_result.scalars().all()
+
+    lines: list[str] = [
+        "# Ankiety GoPOS — eksport pytań",
+        f"# Wygenerowano: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}",
+        "# Ten plik ma format kompatybilny z importem (zakładka Import pytań).",
+        "# Pytania nieaktywne są oznaczone prefiksem '# [NIEAKTYWNE]' i NIE zostaną",
+        "# zaimportowane ponownie w tej formie — usuń prefiks, aby je przywrócić.",
+        "",
+    ]
+
+    any_questions = False
+    for cat in categories:
+        q_result = await db.execute(
+            select(Question)
+            .where(Question.category_id == cat.id)
+            .order_by(Question.position, Question.id)
+        )
+        questions = q_result.scalars().all()
+        if not questions:
+            continue
+        any_questions = True
+        lines.append(f"KATEGORIA: {cat.name}")
+        lines.append("---")
+        for q in questions:
+            type_str = _format_question_type(q.type, q.options)
+            line = f"{q.text} | {type_str}"
+            if not q.active:
+                line = f"# [NIEAKTYWNE] {line}"
+            lines.append(line)
+        lines.append("")
+
+    if not any_questions:
+        lines.append("# Brak pytań w systemie.")
+
+    content = "\n".join(lines) + "\n"
+    filename = f"pytania_export_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M')}.txt"
+    return Response(
+        content=content,
+        media_type="text/plain; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )

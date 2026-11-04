@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { importQuestions } from "./api/admin";
+import { importQuestions, exportQuestions } from "./api/admin";
 
 const TEMPLATE = `# Ankiety GoPOS — szablon importu pytań
 # ─────────────────────────────────────────
@@ -111,7 +111,21 @@ export default function ImportPage() {
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null); // {imported, skipped, errors}
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportError, setExportError] = useState(null);
   const fileRef = useRef(null);
+
+  async function handleExport() {
+    setExportBusy(true);
+    setExportError(null);
+    try {
+      await exportQuestions();
+    } catch (err) {
+      setExportError(err.message);
+    } finally {
+      setExportBusy(false);
+    }
+  }
 
   function handleDownloadTemplate() {
     const blob = new Blob([TEMPLATE], { type: "text/plain;charset=utf-8" });
@@ -148,9 +162,26 @@ export default function ImportPage() {
 
   return (
     <div style={s.page}>
-      <div style={s.heading}>Import pytań</div>
+      <div style={s.heading}>Import / Eksport pytań</div>
       <div style={s.sub}>
         Wklej lub wgraj plik .txt z pytaniami. Pytania zostaną przypisane do istniejących kategorii.
+      </div>
+
+      {/* Eksport */}
+      <div style={s.card}>
+        <div style={s.cardTitle}>Eksport pytań</div>
+        <div style={{ fontSize: 13, color: "#64748b", marginBottom: 12 }}>
+          Pobierz wszystkie pytania z systemu jako plik .txt — w tym samym formacie, który można
+          od razu wgrać ponownie przy imporcie (np. jako backup albo do edycji masowej).
+        </div>
+        <button
+          style={{ ...s.btnPrimary, ...(exportBusy ? s.btnDisabled : {}) }}
+          disabled={exportBusy}
+          onClick={handleExport}
+        >
+          {exportBusy ? "Eksportowanie…" : "⬇ Pobierz pytania (.txt)"}
+        </button>
+        {exportError && <div style={{ ...s.resultErr, marginTop: 10 }}>{exportError}</div>}
       </div>
 
       {/* Format */}

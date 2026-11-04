@@ -93,6 +93,33 @@ export const importQuestions = (text) =>
     body: text,
   });
 
+// --- Eksport pytań ---
+export async function exportQuestions() {
+  const token = getToken();
+  const res = await fetch(BASE + "/export/questions", {
+    headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+  });
+  if (res.status === 401) {
+    localStorage.removeItem("admin_token");
+    window.location.href = "/admin/login";
+    throw new Error("Sesja wygasła");
+  }
+  if (!res.ok) {
+    const d = await res.json().catch(() => ({}));
+    throw new Error(d.detail || "Błąd eksportu");
+  }
+  const blob = await res.blob();
+  const disposition = res.headers.get("Content-Disposition") || "";
+  const match = disposition.match(/filename="?([^"]+)"?/);
+  const filename = match ? match[1] : "pytania_export.txt";
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 // --- Użytkownicy ---
 export const getUsers = () => apiFetch("/users");
 export const createUser = (username, password) =>
