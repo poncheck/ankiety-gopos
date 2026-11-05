@@ -636,11 +636,12 @@ async def get_admin_settings(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(AppSettings).where(AppSettings.id == 1))
     row = result.scalar_one_or_none()
     if row is None:
-        return {"logo_filename": None, "receipt_image_filename": None, "receipt_instructions": None}
+        return {"logo_filename": None, "receipt_image_filename": None, "receipt_instructions": None, "global_category_id": None}
     return {
         "logo_filename": row.logo_filename,
         "receipt_image_filename": row.receipt_image_filename,
         "receipt_instructions": row.receipt_instructions,
+        "global_category_id": row.global_category_id,
         "updated_at": row.updated_at,
     }
 
@@ -701,6 +702,25 @@ async def update_instructions(body: InstructionsUpdate, db: AsyncSession = Depen
     row.receipt_instructions = body.text or None
     await db.commit()
     return {"receipt_instructions": row.receipt_instructions}
+
+
+class GlobalCategoryUpdate(BaseModel):
+    category_id: int | None = None
+
+
+@router.put("/settings/global-category", dependencies=[Depends(_get_current_admin)])
+async def update_global_category(body: GlobalCategoryUpdate, db: AsyncSession = Depends(get_db)):
+    """Ustawia (lub czyści, przy category_id=None) kategorię zbiorczą — jej aktywne
+    pytania są dodawane na końcu KAŻDEJ ankiety, niezależnie od zamówionych produktów
+    (np. ogólne pytania o obsłudze klienta)."""
+    if body.category_id is not None:
+        cat = await db.get(Category, body.category_id)
+        if not cat:
+            raise HTTPException(status_code=404, detail="Kategoria nie istnieje")
+    row = await _get_or_create_settings(db)
+    row.global_category_id = body.category_id
+    await db.commit()
+    return {"global_category_id": row.global_category_id}
 
 
 # ---------- Import pytań ----------

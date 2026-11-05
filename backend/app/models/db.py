@@ -78,6 +78,7 @@ class AppSettings(Base):
     logo_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
     receipt_image_filename: Mapped[str | None] = mapped_column(String(255), nullable=True)
     receipt_instructions: Mapped[str | None] = mapped_column(Text, nullable=True)
+    global_category_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("categories.id"), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 

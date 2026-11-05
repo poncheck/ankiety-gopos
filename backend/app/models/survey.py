@@ -21,6 +21,8 @@ class Product(BaseModel):
 class BillResponse(BaseModel):
     bill_number: str
     products: list[Product]
+    general_questions: list[Question] = []
+    general_category_name: str | None = None
     already_submitted: bool = False
     survey_token: str | None = None
 

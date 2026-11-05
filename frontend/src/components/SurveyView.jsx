@@ -247,6 +247,11 @@ export default function SurveyView({ bill, onDone }) {
         if (val !== undefined && val !== "") answered++;
       }
     }
+    for (const q of bill.general_questions || []) {
+      total++;
+      const val = answers[`general_${q.id}`];
+      if (val !== undefined && val !== "") answered++;
+    }
     return { total, answered };
   }
 
@@ -280,6 +285,17 @@ export default function SurveyView({ bill, onDone }) {
           if (val !== undefined && val !== "") {
             answerList.push({ product_id: product.id, product_name: product.name, question_id: q.id, value: String(val) });
           }
+        }
+      }
+      for (const q of bill.general_questions || []) {
+        const val = answers[`general_${q.id}`];
+        if (val !== undefined && val !== "") {
+          answerList.push({
+            product_id: "general",
+            product_name: bill.general_category_name || "Ogólne",
+            question_id: q.id,
+            value: String(val),
+          });
         }
       }
       const result = await submitSurvey({ bill_number: bill.bill_number, email: email.trim(), marketing_consent: marketingConsent, answers: answerList, survey_token: bill.survey_token });
@@ -321,6 +337,24 @@ export default function SurveyView({ bill, onDone }) {
           )}
         </div>
       ))}
+
+      {bill.general_questions && bill.general_questions.length > 0 && (
+        <div style={styles.productCard}>
+          <div style={styles.productLabel}>{bill.general_category_name || "Pytania ogólne"}</div>
+          <div style={styles.productName}>Kilka pytań na koniec</div>
+          <div style={styles.productPrice}>&nbsp;</div>
+          {bill.general_questions.map((q) => (
+            <div key={`general_${q.id}`} style={styles.questionBlock}>
+              <div style={styles.questionText}>{q.text}</div>
+              <QuestionInput
+                question={q}
+                value={answers[`general_${q.id}`]}
+                onChange={(val) => setAnswer("general", q.id, val)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
 
       <div style={styles.emailSection}>
         <label style={styles.emailLabel} htmlFor="survey-email">

@@ -6,6 +6,8 @@ import {
   deleteLogo,
   uploadReceiptImage,
   deleteReceiptImage,
+  updateGlobalCategory,
+  getCategories,
 } from "./api/admin";
 
 const styles = {
@@ -90,6 +92,16 @@ const styles = {
     fontSize: 14,
     fontWeight: 500,
   },
+  select: {
+    width: "100%",
+    padding: "10px 12px",
+    fontSize: 14,
+    border: "1px solid #cbd5e1",
+    borderRadius: 8,
+    background: "#fff",
+    boxSizing: "border-box",
+  },
+  hint: { fontSize: 13, color: "#64748b", marginBottom: 12, lineHeight: 1.5 },
 };
 
 function ImageField({ label, currentUrl, onUpload, onDelete, accept = "image/*" }) {
@@ -172,12 +184,18 @@ export default function SettingsPage() {
   const [instructions, setInstructions] = useState("");
   const [instrMsg, setInstrMsg] = useState(null);
   const [instrBusy, setInstrBusy] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [globalCategoryId, setGlobalCategoryId] = useState("");
+  const [globalCatMsg, setGlobalCatMsg] = useState(null);
+  const [globalCatBusy, setGlobalCatBusy] = useState(false);
 
   async function load() {
     try {
-      const data = await getAdminSettings();
+      const [data, cats] = await Promise.all([getAdminSettings(), getCategories()]);
       setSettings(data);
       setInstructions(data.receipt_instructions || "");
+      setGlobalCategoryId(data.global_category_id ?? "");
+      setCategories(cats);
     } catch {
       // ignore
     }
@@ -197,6 +215,19 @@ export default function SettingsPage() {
       setInstrMsg({ text: err.message, ok: false });
     } finally {
       setInstrBusy(false);
+    }
+  }
+
+  async function handleSaveGlobalCategory() {
+    setGlobalCatBusy(true);
+    setGlobalCatMsg(null);
+    try {
+      await updateGlobalCategory(globalCategoryId === "" ? null : Number(globalCategoryId));
+      setGlobalCatMsg({ text: "Zapisano ✓", ok: true });
+    } catch (err) {
+      setGlobalCatMsg({ text: err.message, ok: false });
+    } finally {
+      setGlobalCatBusy(false);
     }
   }
 
@@ -251,6 +282,40 @@ export default function SettingsPage() {
         onUpload={doUploadReceipt}
         onDelete={doDeleteReceipt}
       />
+
+      <div style={styles.section}>
+        <div style={styles.sectionTitle}>Pytania ogólne (kategoria zbiorcza)</div>
+        <p style={styles.hint}>
+          Wybierz kategorię, której aktywne pytania mają być dodawane na końcu{" "}
+          <strong>każdej</strong> ankiety — niezależnie od tego, co klient zamówił.
+          Przydatne np. dla pytań o obsłudze klienta: nawet jeśli ktoś zamówi tylko kawę
+          i ta kategoria ma mało własnych pytań, na końcu i tak pojawi się seria pytań ogólnych.
+          Wybrana kategoria jest wyłączona z normalnego losowania pytań per produkt — jej pytania
+          pokazują się zawsze w całości, w osobnym bloku na końcu.
+        </p>
+        <select
+          style={styles.select}
+          value={globalCategoryId}
+          onChange={(e) => setGlobalCategoryId(e.target.value)}
+        >
+          <option value="">— brak (wyłączone) —</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.id}>{c.name} ({c.question_count} pytań)</option>
+          ))}
+        </select>
+        <button
+          style={{ ...styles.saveBtn, ...(globalCatBusy ? styles.btnDisabled : {}) }}
+          disabled={globalCatBusy}
+          onClick={handleSaveGlobalCategory}
+        >
+          {globalCatBusy ? "Zapisywanie…" : "Zapisz"}
+        </button>
+        {globalCatMsg && (
+          <p style={{ ...styles.msg, ...(globalCatMsg.ok ? styles.msgOk : styles.msgErr) }}>
+            {globalCatMsg.text}
+          </p>
+        )}
+      </div>
 
       <div style={styles.section}>
         <div style={styles.sectionTitle}>Instrukcja — jak znaleźć numer paragonu</div>
