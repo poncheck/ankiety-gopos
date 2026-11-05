@@ -299,7 +299,7 @@ export default function SurveyView({ bill, onDone }) {
         }
       }
       const result = await submitSurvey({ bill_number: bill.bill_number, email: email.trim(), marketing_consent: marketingConsent, answers: answerList, survey_token: bill.survey_token });
-      onDone(result.code);
+      onDone();
     } catch (err) {
       setError(err.message);
     } finally {
@@ -361,7 +361,7 @@ export default function SurveyView({ bill, onDone }) {
           Adres e-mail
         </label>
         <p style={styles.emailHint}>
-          Po wysłaniu ankiety otrzymasz na ten adres kod rabatowy do wykorzystania przy kolejnej wizycie.
+          Kod rabatowy do wykorzystania przy kolejnej wizycie wyślemy <strong>wyłącznie</strong> na ten adres e-mail — podaj prawdziwy adres, inaczej go nie otrzymasz.
         </p>
         <input
           id="survey-email"

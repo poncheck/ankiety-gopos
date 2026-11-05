@@ -1,4 +1,8 @@
-from pydantic import BaseModel, Field
+import re
+
+from pydantic import BaseModel, Field, field_validator
+
+_EMAIL_RE = re.compile(r"^[^\s@]+@[^\s@]+\.[^\s@]+$")
 
 
 class Question(BaseModel):
@@ -36,7 +40,15 @@ class SurveyAnswer(BaseModel):
 
 class SurveySubmission(BaseModel):
     bill_number: str = Field(..., max_length=100)
-    email: str | None = Field(None, max_length=255)
+    email: str = Field(..., max_length=255, min_length=5)
     marketing_consent: bool = False
     answers: list[SurveyAnswer] = Field(..., max_length=200)
     survey_token: str | None = None
+
+    @field_validator("email")
+    @classmethod
+    def validate_email(cls, v: str) -> str:
+        v = v.strip()
+        if not _EMAIL_RE.match(v):
+            raise ValueError("Podaj poprawny adres e-mail — kod rabatowy jest wysyłany tylko mailem")
+        return v
