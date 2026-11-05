@@ -173,13 +173,12 @@ async def submit_survey(submission: SurveySubmission, request: Request, db: Asyn
 
     await db.commit()
 
-    logger.info("Paragon %s — email: %s, kod: %s", submission.bill_number, submission.email or "(brak)", code)
+    logger.info("Paragon %s — email: %s, kod: %s", submission.bill_number, submission.email, code)
 
-    if submission.email:
-        try:
-            await send_survey_code(submission.email, code)
-        except Exception:
-            logger.exception("Błąd wysyłki emaila dla paragonu %s", submission.bill_number)
+    try:
+        await send_survey_code(submission.email, code)
+    except Exception:
+        logger.exception("Błąd wysyłki emaila dla paragonu %s", submission.bill_number)
 
     try:
         await send_survey_results(
@@ -193,7 +192,6 @@ async def submit_survey(submission: SurveySubmission, request: Request, db: Asyn
 
     return {
         "status": "ok",
-        "message": "Dziękujemy za wypełnienie ankiety!",
+        "message": "Dziękujemy za wypełnienie ankiety! Kod rabatowy wysłaliśmy na Twój adres e-mail.",
         "response_id": survey_response.id,
-        "code": code,
     }

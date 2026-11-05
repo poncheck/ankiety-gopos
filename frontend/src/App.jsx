@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import ReceiptForm from "./components/ReceiptForm.jsx";
 import SurveyView from "./components/SurveyView.jsx";
-import BarcodeDisplay from "./components/BarcodeDisplay.jsx";
 import { fetchBill } from "./api/survey.js";
 import LoginPage from "./admin/LoginPage.jsx";
 import AdminLayout from "./admin/AdminLayout.jsx";
@@ -18,7 +17,6 @@ import UsersPage from "./admin/UsersPage.jsx";
 function SurveyApp() {
   const [bill, setBill] = useState(null);
   const [submitted, setSubmitted] = useState(false);
-  const [surveyCode, setSurveyCode] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const [settings, setSettings] = useState({});
@@ -48,23 +46,20 @@ function SurveyApp() {
       <div style={{ textAlign: "center", maxWidth: "480px", margin: "0 auto" }}>
         <h1 style={{ fontSize: "1.6rem", color: "#111827", marginBottom: "0.5rem" }}>Dziękujemy!</h1>
         <p style={{ color: "#6b7280", marginBottom: "1.5rem" }}>Twoja opinia została zapisana.</p>
-        {surveyCode && (
-          <div style={{
-            background: "#f0fdf4",
-            border: "2px dashed #16a34a",
-            borderRadius: "12px",
-            padding: "1.5rem",
-            marginBottom: "1rem",
-          }}>
-            <p style={{ color: "#15803d", fontWeight: 600, marginBottom: "1rem" }}>
-              Twój kod rabatowy:
-            </p>
-            <BarcodeDisplay value={surveyCode} />
-            <p style={{ color: "#6b7280", fontSize: "0.85rem", marginTop: "1rem" }}>
-              Pokaż kod kasjerowi lub zeskanuj przy kasie. Kod został też wysłany na Twój adres e-mail.
-            </p>
-          </div>
-        )}
+        <div style={{
+          background: "#f0fdf4",
+          border: "2px dashed #16a34a",
+          borderRadius: "12px",
+          padding: "1.5rem",
+          marginBottom: "1rem",
+        }}>
+          <p style={{ color: "#15803d", fontWeight: 600, marginBottom: "0.5rem" }}>
+            📧 Sprawdź swoją skrzynkę e-mail
+          </p>
+          <p style={{ color: "#166534", fontSize: "0.9rem" }}>
+            Kod rabatowy wysłaliśmy na podany adres. Pokaż go kasjerowi przy kolejnej wizycie.
+          </p>
+        </div>
       </div>
     );
   }
@@ -109,7 +104,7 @@ function SurveyApp() {
   }
 
   if (bill) {
-    return <SurveyView bill={bill} onDone={(code) => { setSurveyCode(code); setSubmitted(true); }} />;
+    return <SurveyView bill={bill} onDone={() => setSubmitted(true)} />;
   }
 
   return (
